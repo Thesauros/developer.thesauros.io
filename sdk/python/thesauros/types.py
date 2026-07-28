@@ -31,6 +31,9 @@ from typing import Any, Dict, List, Optional, TypedDict
 # DeliveryStatus     = "delivered" | "failed"
 # UsageRange         = "24h" | "7d" | "30d"
 # ComponentStatus    = "operational" | "degraded" | "partial_outage" | "major_outage"
+# UserStatus         = "active" | "disabled"
+# LedgerEntryType    = "deposit" | "withdraw" | "close" | "accrual"
+# ReconciliationStatus = "reconciled" | "mismatch"
 
 
 # ---------------------------------------------------------------------------
@@ -288,3 +291,105 @@ class Status(TypedDict):
     components: List[StatusComponent]
     incidents: List[Incident]
     updated_at: str
+
+
+# ---------------------------------------------------------------------------
+# 4.9 Users
+# ---------------------------------------------------------------------------
+class User(TypedDict):
+    """A platform user.
+
+    Maps to one or more wallets and an external identifier in the caller's own
+    system.
+    """
+
+    id: str
+    object: str
+    external_id: str  # the caller's own unique identifier for this user
+    label: Optional[str]
+    email: Optional[str]
+    metadata: Dict[str, Any]
+    wallets: List[str]
+    status: str  # active | disabled
+    created_at: str
+    updated_at: str
+
+
+class LedgerEntry(TypedDict):
+    """A single ledger entry recording a signed movement of funds.
+
+    ``amount`` is signed (deposits/accruals positive, withdrawals/closes
+    negative).
+    """
+
+    id: str
+    object: str
+    at: str  # ISO-8601 timestamp
+    user_id: Optional[str]
+    position_id: str
+    wallet: str
+    asset: str
+    type: str  # deposit | withdraw | close | accrual
+    amount: float  # signed
+    balance_after: float
+    vault_id: str
+    settled: bool
+    ref: str
+
+
+# ---------------------------------------------------------------------------
+# 4.10 Reconciliation
+# ---------------------------------------------------------------------------
+class Balance(TypedDict):
+    """An aggregated balance for a user (or the whole platform) and asset."""
+
+    object: str
+    user_id: Optional[str]
+    asset: str
+    principal: float
+    current_value: float
+    accrued_yield: float
+    positions: int  # number of positions contributing to this balance
+
+
+class ReconciliationBreakdown(TypedDict):
+    """Per-asset contribution to a reconciliation result."""
+
+    asset: str
+    recorded: float
+    onchain: float
+    discrepancy: float
+
+
+class Reconciliation(TypedDict):
+    """The result of comparing recorded balances against on-chain balances.
+
+    All monetary fields are in the asset's native units; ``tolerance`` is the
+    threshold within which a ``discrepancy`` is still considered ``reconciled``.
+    """
+
+    object: str
+    as_of: str  # ISO-8601 timestamp
+    scope: str
+    recorded_total: float
+    onchain_total: float
+    discrepancy: float
+    unsettled_yield: float
+    tolerance: float
+    status: str  # reconciled | mismatch
+    positions: int  # number of positions included
+    breakdown: List[ReconciliationBreakdown]
+
+
+class BalanceSnapshot(TypedDict):
+    """A point-in-time snapshot of platform balances."""
+
+    object: str
+    date: str  # calendar date (YYYY-MM-DD)
+    t: int  # Unix epoch timestamp in milliseconds
+    principal: float
+    value: float
+    accrued: float
+    positions: int  # number of positions at snapshot time
+    users: int  # number of users at snapshot time
+    by_asset: List[Dict[str, Any]]
