@@ -25,6 +25,16 @@ function chooseVault(asset, strategy) {
   return best;
 }
 
+/** Resolve a user reference (usr_ id or partner external_id) to a user id. */
+function resolveUser(ref) {
+  if (ref == null || ref === '') return null;
+  const byId = get('users', ref);
+  if (byId) return byId.id;
+  const byExternal = filter('users', (u) => u.external_id === String(ref))[0];
+  if (byExternal) return byExternal.id;
+  fail('invalid_request', `No user matches "${ref}" (provide a user id or external_id).`);
+}
+
 export const POST = apiHandler({}, async (request, ctx, api) => {
   const body = await readJson(request);
   const { wallet, asset, amount } = body;
@@ -41,6 +51,7 @@ export const POST = apiHandler({}, async (request, ctx, api) => {
   }
   const strategy = body.strategy || 'auto';
   const vault = chooseVault(asset, strategy);
+  const user_id = resolveUser(body.user);
 
   // Idempotent: a retried POST with the same Idempotency-Key returns the
   // original position instead of opening a duplicate.
@@ -51,6 +62,7 @@ export const POST = apiHandler({}, async (request, ctx, api) => {
     const position = create('positions', {
       id,
       object: 'position',
+      user_id,
       wallet,
       asset,
       chain: vault.chain,
@@ -94,9 +106,15 @@ export const GET = apiHandler({}, async (request, ctx, api) => {
   const { searchParams } = new URL(request.url);
   const wallet = searchParams.get('wallet');
   const status = searchParams.get('status');
+  const userId = searchParams.get('user_id');
 
   const positions = all('positions')
-    .filter((p) => (!wallet || p.wallet === wallet) && (!status || p.status === status))
+    .filter(
+      (p) =>
+        (!wallet || p.wallet === wallet) &&
+        (!status || p.status === status) &&
+        (!userId || p.user_id === userId),
+    )
     .map(serializePosition);
   const page = paginate(request, positions);
   return api.list(page.items, { meta: page.meta });

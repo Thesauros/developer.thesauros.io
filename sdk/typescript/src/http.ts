@@ -62,7 +62,7 @@ export interface LastResponse {
 
 /** Internal description of a single API call. */
 export interface RequestOptions {
-  method: 'GET' | 'POST' | 'DELETE';
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   /** Path relative to the base URL, e.g. `vaults` or `positions/pos_1/withdraw`. */
   path: string;
   query?: Record<string, string | number | boolean | undefined>;

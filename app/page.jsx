@@ -15,6 +15,8 @@ import {
   IconPulse,
   IconSearch,
   IconExternal,
+  IconUsers,
+  IconScale,
 } from './lib/icons';
 import Overview from './views/Overview';
 import Quickstart from './views/Quickstart';
@@ -24,6 +26,8 @@ import Webhooks from './views/Webhooks';
 import Usage from './views/Usage';
 import Vaults from './views/Vaults';
 import Status from './views/Status';
+import Users from './views/Users';
+import Reconciliation from './views/Reconciliation';
 
 const NAV_GROUPS = [
   {
@@ -38,12 +42,14 @@ const NAV_GROUPS = [
     items: [
       { id: 'reference', label: 'API Reference', icon: IconBook },
       { id: 'keys', label: 'API Keys', icon: IconKey },
+      { id: 'users', label: 'Users', icon: IconUsers },
       { id: 'webhooks', label: 'Webhooks', icon: IconWebhook },
     ],
   },
   {
     label: 'Operate',
     items: [
+      { id: 'reconciliation', label: 'Reconciliation', icon: IconScale },
       { id: 'usage', label: 'Usage', icon: IconChart },
       { id: 'vaults', label: 'Vaults', icon: IconVault },
       { id: 'status', label: 'Status', icon: IconPulse },
@@ -56,7 +62,9 @@ const VIEW_META = {
   quickstart: 'Quickstart',
   reference: 'API Reference',
   keys: 'API Keys',
+  users: 'Users',
   webhooks: 'Webhooks',
+  reconciliation: 'Reconciliation',
   usage: 'Usage',
   vaults: 'Vaults',
   status: 'Status',
@@ -179,7 +187,9 @@ export default function PlatformPage() {
             {view === 'quickstart' ? <Quickstart {...viewProps} /> : null}
             {view === 'reference' ? <ApiReference {...viewProps} /> : null}
             {view === 'keys' ? <ApiKeys {...viewProps} /> : null}
+            {view === 'users' ? <Users {...viewProps} /> : null}
             {view === 'webhooks' ? <Webhooks {...viewProps} /> : null}
+            {view === 'reconciliation' ? <Reconciliation {...viewProps} /> : null}
             {view === 'usage' ? <Usage {...viewProps} /> : null}
             {view === 'vaults' ? <Vaults {...viewProps} /> : null}
             {view === 'status' ? <Status {...viewProps} /> : null}

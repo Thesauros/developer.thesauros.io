@@ -205,6 +205,22 @@ export const IconCpu = (p) => (
   </I>
 );
 
+export const IconUsers = (p) => (
+  <I {...p}>
+    <circle cx="6" cy="5.2" r="2.4" />
+    <path d="M2.2 13.2c0-2.1 1.7-3.6 3.8-3.6s3.8 1.5 3.8 3.6" />
+    <path d="M10.5 3.4a2.2 2.2 0 0 1 0 4M11.5 9.9c1.4.4 2.3 1.6 2.3 3.3" opacity=".7" />
+  </I>
+);
+
+export const IconScale = (p) => (
+  <I {...p}>
+    <path d="M8 2.2v11.6M4.5 13.8h7" />
+    <path d="M8 3.8 3.4 5.4M8 3.8l4.6 1.6" />
+    <path d="M3.4 5.4 1.8 9a1.9 1.9 0 0 0 3.2 0L3.4 5.4ZM12.6 5.4 11 9a1.9 1.9 0 0 0 3.2 0l-1.6-3.6Z" />
+  </I>
+);
+
 // Thesauros brand mark: abstract vault / routing glyph.
 export function BrandMark({ size = 18 }) {
   return (

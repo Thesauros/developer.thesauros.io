@@ -107,6 +107,15 @@ export type UsageRange = '24h' | '7d' | '30d';
 /** Health status of a platform component (and of the system overall). */
 export type ComponentStatus = 'operational' | 'degraded' | 'partial_outage' | 'major_outage';
 
+/** Lifecycle status of a user. */
+export type UserStatus = 'active' | 'disabled';
+
+/** The kind of movement recorded in the ledger. */
+export type LedgerEntryType = 'deposit' | 'withdraw' | 'close' | 'accrual';
+
+/** Outcome of a reconciliation run. */
+export type ReconciliationStatus = 'reconciled' | 'mismatch';
+
 /* -------------------------------------------------------------------------- */
 /* 4.1 Keys                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -369,6 +378,112 @@ export interface Status {
 }
 
 /* -------------------------------------------------------------------------- */
+/* 4.9 Users                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A platform user, mapped to one or more wallets and an external identifier in
+ * the caller's own system.
+ */
+export interface User {
+  id: string;
+  object: 'user';
+  /** The caller's own unique identifier for this user. */
+  external_id: string;
+  label: string | null;
+  email: string | null;
+  metadata: Record<string, unknown>;
+  wallets: string[];
+  status: UserStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * A single ledger entry recording a signed movement of funds. `amount` is
+ * signed (deposits/accruals positive, withdrawals/closes negative).
+ */
+export interface LedgerEntry {
+  id: string;
+  object: 'ledger_entry';
+  /** ISO-8601 timestamp. */
+  at: string;
+  user_id: string | null;
+  position_id: string;
+  wallet: string;
+  asset: string;
+  type: LedgerEntryType;
+  /** Signed amount. */
+  amount: number;
+  balance_after: number;
+  vault_id: string;
+  settled: boolean;
+  ref: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 4.10 Reconciliation                                                         */
+/* -------------------------------------------------------------------------- */
+
+/** An aggregated balance for a user (or the whole platform) and asset. */
+export interface Balance {
+  object: 'balance';
+  user_id: string | null;
+  asset: string;
+  principal: number;
+  current_value: number;
+  accrued_yield: number;
+  /** Number of positions contributing to this balance. */
+  positions: number;
+}
+
+/** Per-asset contribution to a reconciliation result. */
+export interface ReconciliationBreakdown {
+  asset: string;
+  recorded: number;
+  onchain: number;
+  discrepancy: number;
+}
+
+/**
+ * The result of comparing recorded balances against on-chain balances. All
+ * monetary fields are in the asset's native units; `tolerance` is the threshold
+ * within which a `discrepancy` is still considered `reconciled`.
+ */
+export interface Reconciliation {
+  object: 'reconciliation';
+  /** ISO-8601 timestamp the reconciliation was computed at. */
+  as_of: string;
+  scope: string;
+  recorded_total: number;
+  onchain_total: number;
+  discrepancy: number;
+  unsettled_yield: number;
+  tolerance: number;
+  status: ReconciliationStatus;
+  /** Number of positions included in the reconciliation. */
+  positions: number;
+  breakdown: ReconciliationBreakdown[];
+}
+
+/** A point-in-time snapshot of platform balances. */
+export interface BalanceSnapshot {
+  object: 'balance_snapshot';
+  /** Calendar date (`YYYY-MM-DD`). */
+  date: string;
+  /** Unix epoch timestamp in milliseconds. */
+  t: number;
+  principal: number;
+  value: number;
+  accrued: number;
+  /** Number of positions at snapshot time. */
+  positions: number;
+  /** Number of users at snapshot time. */
+  users: number;
+  by_asset: Record<string, unknown>[];
+}
+
+/* -------------------------------------------------------------------------- */
 /* Request parameter shapes                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -426,4 +541,73 @@ export interface WebhookEventsParams {
 /** Query for `GET /usage`. */
 export interface UsageGetParams {
   range?: UsageRange;
+}
+
+/** Body for `POST /users`. `external_id` is required; all else is optional. */
+export interface UserCreateParams {
+  external_id: string;
+  label?: string;
+  email?: string;
+  metadata?: Record<string, unknown>;
+  wallets?: string[];
+}
+
+/** Query for `GET /users`. All filters are optional. */
+export interface UserListParams {
+  status?: UserStatus;
+  wallet?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+/** Body for `PATCH /users/:id`. All fields are optional. */
+export interface UserUpdateParams {
+  label?: string;
+  email?: string;
+  metadata?: Record<string, unknown>;
+  wallets?: string[];
+  status?: UserStatus;
+}
+
+/** Query for `GET /users/:id/positions`. All filters are optional. */
+export interface UserPositionsParams {
+  status?: PositionStatus;
+  limit?: number;
+  cursor?: string;
+}
+
+/** Query for `GET /users/:id/ledger`. All filters are optional. */
+export interface UserLedgerParams {
+  asset?: string;
+  type?: LedgerEntryType;
+  limit?: number;
+  cursor?: string;
+}
+
+/** Query for `GET /reconciliation/ledger`. All filters are optional. */
+export interface ReconciliationLedgerParams {
+  user_id?: string;
+  position_id?: string;
+  asset?: string;
+  type?: LedgerEntryType;
+  limit?: number;
+  cursor?: string;
+}
+
+/** Query for `GET /reconciliation/balances`. All filters are optional. */
+export interface ReconciliationBalancesParams {
+  user_id?: string;
+  asset?: string;
+}
+
+/** Query for `GET /reconciliation/report`. */
+export interface ReconciliationReportParams {
+  scope?: string;
+}
+
+/** Query for `GET /reconciliation/snapshots`. All filters are optional. */
+export interface ReconciliationSnapshotsParams {
+  from?: string;
+  to?: string;
+  asset?: string;
 }

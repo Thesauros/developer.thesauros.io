@@ -15,11 +15,12 @@ developer.thesauros.io/
 │   ├── layout.jsx               Root layout (Onest + JetBrains Mono)
 │   ├── platform.module.css      Portal design system (dark console)
 │   ├── views/                   Overview, Quickstart, ApiReference (live Try-it),
-│   │                            ApiKeys, Webhooks, Usage, Vaults, Status
+│   │                            ApiKeys, Users, Webhooks, Reconciliation,
+│   │                            Usage, Vaults, Status
 │   ├── ui/                      CodeBlock + syntax highlight, SVG charts, primitives
 │   ├── lib/                     Client-side API helper + formatters, icon set
 │   ├── data/                    Endpoint catalog + code samples (TS/Python/cURL)
-│   └── api/v1/                  REST API — 18 route handlers (see below)
+│   └── api/v1/                  REST API — 26 route handlers (see below)
 ├── lib/api/                     Server core: auth, rate limiting, simulation engine,
 │                                webhook signing/dispatch, SSRF guard, HTTP envelopes
 ├── sdk/
@@ -65,11 +66,13 @@ APY values are decimal fractions (`0.052` == 5.2%).
 | Area | Endpoints |
 | --- | --- |
 | Keys | `POST /keys`, `GET /keys`, `DELETE /keys/:id` |
+| Users | `POST /users`, `GET /users`, `GET /users/:id`, `PATCH /users/:id`, `GET /users/:id/positions`, `GET /users/:id/ledger` |
 | Vaults | `GET /vaults`, `GET /vaults/:id` |
 | Yield | `GET /yield`, `GET /yield/:asset` |
 | Positions | `POST /positions`, `GET /positions`, `GET /positions/:id`, `POST /positions/:id/withdraw`, `GET /positions/:id/history` |
 | Rebalances | `GET /rebalances` |
 | Webhooks | `POST /webhooks`, `GET /webhooks`, `DELETE /webhooks/:id`, `POST /webhooks/:id/test`, `GET /webhooks/events` |
+| Reconciliation | `GET /reconciliation/ledger`, `GET /reconciliation/balances`, `GET /reconciliation/report`, `GET /reconciliation/snapshots` |
 | Telemetry | `GET /usage`, `GET /status` (public), `GET /openapi.json` (public) |
 
 Cross-cutting behavior:

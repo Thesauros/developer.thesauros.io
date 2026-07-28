@@ -10,9 +10,12 @@
 import { HttpClient, type ClientConfig, type LastResponse } from './http.js';
 import type {
   ApiKey,
+  Balance,
+  BalanceSnapshot,
   DeletionResult,
   Delivery,
   KeyCreateParams,
+  LedgerEntry,
   Position,
   PositionCreateParams,
   PositionEvent,
@@ -20,10 +23,21 @@ import type {
   PositionWithdrawParams,
   Rebalance,
   RebalanceListParams,
+  Reconciliation,
+  ReconciliationBalancesParams,
+  ReconciliationLedgerParams,
+  ReconciliationReportParams,
+  ReconciliationSnapshotsParams,
   RevokedKey,
   Status,
   Usage,
   UsageGetParams,
+  User,
+  UserCreateParams,
+  UserLedgerParams,
+  UserListParams,
+  UserPositionsParams,
+  UserUpdateParams,
   Vault,
   VaultListParams,
   Webhook,
@@ -206,6 +220,93 @@ export class StatusResource {
   }
 }
 
+/** Platform users (`/users`). */
+export class UsersResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /**
+   * Create a user keyed by your own `external_id`. Optionally attach a `label`,
+   * `email`, free-form `metadata`, and one or more `wallets`.
+   */
+  create(params: UserCreateParams): Promise<User> {
+    return this.http.request<User>({ method: 'POST', path: 'users', body: params });
+  }
+
+  /** List users, optionally filtered by `status` and/or `wallet`. */
+  list(params: UserListParams = {}): Promise<User[]> {
+    return this.http.request<User[]>({ method: 'GET', path: 'users', query: { ...params } });
+  }
+
+  /** Retrieve a single user by id. */
+  retrieve(id: string): Promise<User> {
+    return this.http.request<User>({ method: 'GET', path: `users/${enc(id)}` });
+  }
+
+  /** Update mutable user fields. Only the provided fields are changed. */
+  update(id: string, params: UserUpdateParams = {}): Promise<User> {
+    return this.http.request<User>({ method: 'PATCH', path: `users/${enc(id)}`, body: params });
+  }
+
+  /** List the positions belonging to a user. */
+  positions(id: string, params: UserPositionsParams = {}): Promise<Position[]> {
+    return this.http.request<Position[]>({
+      method: 'GET',
+      path: `users/${enc(id)}/positions`,
+      query: { ...params },
+    });
+  }
+
+  /** List the ledger entries belonging to a user. */
+  ledger(id: string, params: UserLedgerParams = {}): Promise<LedgerEntry[]> {
+    return this.http.request<LedgerEntry[]>({
+      method: 'GET',
+      path: `users/${enc(id)}/ledger`,
+      query: { ...params },
+    });
+  }
+}
+
+/** Reconciliation (`/reconciliation`). */
+export class ReconciliationResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /** Query the global ledger, optionally scoped by user/position/asset/type. */
+  ledger(params: ReconciliationLedgerParams = {}): Promise<LedgerEntry[]> {
+    return this.http.request<LedgerEntry[]>({
+      method: 'GET',
+      path: 'reconciliation/ledger',
+      query: { ...params },
+    });
+  }
+
+  /** List aggregated balances, optionally scoped to a `user_id` and/or `asset`. */
+  balances(params: ReconciliationBalancesParams = {}): Promise<Balance[]> {
+    return this.http.request<Balance[]>({
+      method: 'GET',
+      path: 'reconciliation/balances',
+      query: { ...params },
+    });
+  }
+
+  /** Fetch a reconciliation of recorded vs. on-chain balances for a `scope`. */
+  report(params: ReconciliationReportParams = {}): Promise<Reconciliation> {
+    return this.http.request<Reconciliation>({
+      method: 'GET',
+      path: 'reconciliation/report',
+      query: { ...params },
+    });
+  }
+
+  /** List historical balance snapshots, optionally bounded by `from`/`to`/`asset`. */
+  snapshots(params: ReconciliationSnapshotsParams = {}): Promise<BalanceSnapshot[]> {
+    return this.http.request<BalanceSnapshot[]>({
+      method: 'GET',
+      path: 'reconciliation/snapshots',
+      query: { ...params },
+    });
+  }
+}
+
 /**
  * Thesauros Developer Platform API client.
  *
@@ -228,6 +329,8 @@ export class Thesauros {
   readonly webhooks: WebhooksResource;
   readonly usage: UsageResource;
   readonly status: StatusResource;
+  readonly users: UsersResource;
+  readonly reconciliation: ReconciliationResource;
 
   private readonly http: HttpClient;
 
@@ -241,6 +344,8 @@ export class Thesauros {
     this.webhooks = new WebhooksResource(this.http);
     this.usage = new UsageResource(this.http);
     this.status = new StatusResource(this.http);
+    this.users = new UsersResource(this.http);
+    this.reconciliation = new ReconciliationResource(this.http);
   }
 
   /**

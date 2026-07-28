@@ -123,11 +123,13 @@ function buildDoc() {
     servers: [{ url: '/api/v1', description: 'Sandbox (relative to deployed host)' }],
     tags: [
       { name: 'keys', description: 'API key management' },
+      { name: 'users', description: 'Partner end-users' },
       { name: 'vaults', description: 'Yield vaults' },
       { name: 'yield', description: 'Aggregated yield' },
       { name: 'positions', description: 'Positions & lifecycle' },
       { name: 'rebalances', description: 'Rebalance history' },
       { name: 'webhooks', description: 'Webhook endpoints & events' },
+      { name: 'reconciliation', description: 'Ledger, balances & reconciliation' },
       { name: 'telemetry', description: 'Usage & status' },
     ],
     security: AUTH,
@@ -162,6 +164,71 @@ function buildDoc() {
           description: 'Revokes a key. The shared sandbox key (key_bootstrap) cannot be revoked.',
           parameters: [pathId('Key id')],
           responses: withErrors({ 200: single('ApiKey', 'Key revoked') }, [400, 401, 404, 429, 500]),
+        },
+      },
+      '/users': {
+        post: {
+          tags: ['users'],
+          summary: 'Create an end-user',
+          description:
+            'Maps one of your customers to a Thesauros user via external_id (unique) and links their wallets.',
+          parameters: [idempotencyHeader()],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: ref('CreateUserRequest') } },
+          },
+          responses: withErrors({ 201: single('User', 'User created') }, [400, 401, 429, 500]),
+        },
+        get: {
+          tags: ['users'],
+          summary: 'List end-users',
+          parameters: [
+            q('status', 'Filter by status', { enum: ['active', 'disabled'] }),
+            q('wallet', 'Filter by linked wallet'),
+            ...paginationParams(),
+          ],
+          responses: withErrors({ 200: listOf('User', 'Users') }, [401, 429, 500]),
+        },
+      },
+      '/users/{id}': {
+        get: {
+          tags: ['users'],
+          summary: 'Get an end-user',
+          parameters: [pathId('User id')],
+          responses: withErrors({ 200: single('User', 'The user') }, [401, 404, 429, 500]),
+        },
+        patch: {
+          tags: ['users'],
+          summary: 'Update an end-user',
+          parameters: [pathId('User id')],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: ref('UpdateUserRequest') } },
+          },
+          responses: withErrors({ 200: single('User', 'Updated user') }, [400, 401, 404, 429, 500]),
+        },
+      },
+      '/users/{id}/positions': {
+        get: {
+          tags: ['users'],
+          summary: "A user's positions",
+          parameters: [pathId('User id'), ...paginationParams()],
+          responses: withErrors({ 200: listOf('Position', "User's positions with live accrual") }, [
+            401, 404, 429, 500,
+          ]),
+        },
+      },
+      '/users/{id}/ledger': {
+        get: {
+          tags: ['users'],
+          summary: "A user's reconciliation ledger",
+          parameters: [
+            pathId('User id'),
+            q('asset', 'Filter by asset', { enum: ['USDC', 'USDT'] }),
+            q('type', 'Filter by entry type', { enum: ['deposit', 'withdraw', 'close', 'accrual'] }),
+            ...paginationParams(),
+          ],
+          responses: withErrors({ 200: listOf('LedgerEntry', "User's ledger") }, [401, 404, 429, 500]),
         },
       },
       '/vaults': {
@@ -308,6 +375,53 @@ function buildDoc() {
           description: 'Dispatches a synthetic system.status event and returns the delivery record.',
           parameters: [pathId('Webhook id')],
           responses: withErrors({ 200: single('Delivery', 'Resulting delivery (delivered or failed)') }, [401, 404, 429, 500]),
+        },
+      },
+      '/reconciliation/ledger': {
+        get: {
+          tags: ['reconciliation'],
+          summary: 'Reconciliation ledger',
+          description: 'Append-only ledger of balance-affecting entries with running balance per position.',
+          parameters: [
+            q('user_id', 'Filter by user'),
+            q('position_id', 'Filter by position'),
+            q('asset', 'Filter by asset', { enum: ['USDC', 'USDT'] }),
+            q('type', 'Filter by entry type', { enum: ['deposit', 'withdraw', 'close', 'accrual'] }),
+            ...paginationParams(),
+          ],
+          responses: withErrors({ 200: listOf('LedgerEntry', 'Ledger entries') }, [401, 429, 500]),
+        },
+      },
+      '/reconciliation/balances': {
+        get: {
+          tags: ['reconciliation'],
+          summary: 'Current balances',
+          description: 'Current recorded balances grouped by user and asset (active positions).',
+          parameters: [q('user_id', 'Filter by user'), q('asset', 'Filter by asset', { enum: ['USDC', 'USDT'] })],
+          responses: withErrors({ 200: listOf('Balance', 'Balances by user/asset') }, [401, 429, 500]),
+        },
+      },
+      '/reconciliation/report': {
+        get: {
+          tags: ['reconciliation'],
+          summary: 'Reconciliation report',
+          description:
+            'Recorded (ledger) vs on-chain (settled) totals. The difference is intraday unsettled yield; within tolerance the status is "reconciled".',
+          parameters: [q('scope', 'all, a user id (usr_...) or a position id (pos_...)')],
+          responses: withErrors({ 200: single('Reconciliation', 'Reconciliation result') }, [401, 429, 500]),
+        },
+      },
+      '/reconciliation/snapshots': {
+        get: {
+          tags: ['reconciliation'],
+          summary: 'Balance snapshots',
+          description: 'Daily balance snapshots over a range, for period accounting.',
+          parameters: [
+            q('from', 'Start date (YYYY-MM-DD)'),
+            q('to', 'End date (YYYY-MM-DD)'),
+            q('asset', 'Filter by asset', { enum: ['USDC', 'USDT'] }),
+          ],
+          responses: withErrors({ 200: listOf('BalanceSnapshot', 'Daily snapshots') }, [401, 429, 500]),
         },
       },
       '/usage': {
@@ -459,6 +573,7 @@ function buildDoc() {
             asset: { type: 'string', enum: ['USDC', 'USDT'] },
             amount: { type: 'number', exclusiveMinimum: 0 },
             strategy: { type: 'string', description: '"auto" or a target vault id', default: 'auto' },
+            user: { type: 'string', description: 'Optional user id (usr_...) or external_id to associate' },
           },
         },
         WithdrawRequest: {
@@ -475,6 +590,7 @@ function buildDoc() {
           properties: {
             id: { type: 'string', example: 'pos_seed_alpha' },
             object: { type: 'string', enum: ['position'] },
+            user_id: { type: ['string', 'null'], description: 'Owning end-user, if associated' },
             wallet: { type: 'string' },
             asset: { type: 'string', enum: ['USDC', 'USDT'] },
             chain: { type: 'string', enum: ['base', 'arbitrum'] },
@@ -612,6 +728,116 @@ function buildDoc() {
             incidents: { type: 'array', items: { type: 'object' } },
             uptime_s: { type: 'integer' },
             updated_at: { type: 'string', format: 'date-time' },
+          },
+        },
+        CreateUserRequest: {
+          type: 'object',
+          required: ['external_id'],
+          properties: {
+            external_id: { type: 'string', description: 'Your customer id (unique)' },
+            label: { type: ['string', 'null'] },
+            email: { type: ['string', 'null'], format: 'email' },
+            metadata: { type: 'object' },
+            wallets: { type: 'array', items: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$' } },
+          },
+        },
+        UpdateUserRequest: {
+          type: 'object',
+          properties: {
+            label: { type: ['string', 'null'] },
+            email: { type: ['string', 'null'], format: 'email' },
+            metadata: { type: 'object' },
+            wallets: { type: 'array', items: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$' } },
+            status: { type: 'string', enum: ['active', 'disabled'] },
+          },
+        },
+        User: {
+          type: 'object',
+          required: ['id', 'object', 'external_id', 'wallets', 'status', 'created_at'],
+          properties: {
+            id: { type: 'string', example: 'usr_seed_nova' },
+            object: { type: 'string', enum: ['user'] },
+            external_id: { type: 'string' },
+            label: { type: ['string', 'null'] },
+            email: { type: ['string', 'null'] },
+            metadata: { type: 'object' },
+            wallets: { type: 'array', items: { type: 'string' } },
+            status: { type: 'string', enum: ['active', 'disabled'] },
+            created_at: { type: 'string', format: 'date-time' },
+            updated_at: { type: 'string', format: 'date-time' },
+          },
+        },
+        LedgerEntry: {
+          type: 'object',
+          required: ['id', 'object', 'at', 'position_id', 'asset', 'type', 'amount', 'balance_after', 'settled'],
+          properties: {
+            id: { type: 'string' },
+            object: { type: 'string', enum: ['ledger_entry'] },
+            at: { type: 'string', format: 'date-time' },
+            user_id: { type: ['string', 'null'] },
+            position_id: { type: 'string' },
+            wallet: { type: 'string' },
+            asset: { type: 'string', enum: ['USDC', 'USDT'] },
+            type: { type: 'string', enum: ['deposit', 'withdraw', 'close', 'accrual'] },
+            amount: { type: 'number', description: 'Signed delta' },
+            balance_after: { type: 'number', description: 'Running balance for the position' },
+            vault_id: { type: 'string' },
+            settled: { type: 'boolean' },
+            ref: { type: 'string' },
+          },
+        },
+        Balance: {
+          type: 'object',
+          properties: {
+            object: { type: 'string', enum: ['balance'] },
+            user_id: { type: ['string', 'null'] },
+            asset: { type: 'string', enum: ['USDC', 'USDT'] },
+            principal: { type: 'number' },
+            current_value: { type: 'number' },
+            accrued_yield: { type: 'number' },
+            positions: { type: 'integer' },
+          },
+        },
+        Reconciliation: {
+          type: 'object',
+          required: ['object', 'as_of', 'scope', 'recorded_total', 'onchain_total', 'discrepancy', 'status'],
+          properties: {
+            object: { type: 'string', enum: ['reconciliation'] },
+            as_of: { type: 'string', format: 'date-time' },
+            scope: { type: 'string' },
+            recorded_total: { type: 'number' },
+            onchain_total: { type: 'number' },
+            discrepancy: { type: 'number' },
+            unsettled_yield: { type: 'number' },
+            tolerance: { type: 'number' },
+            status: { type: 'string', enum: ['reconciled', 'mismatch'] },
+            positions: { type: 'integer' },
+            breakdown: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  asset: { type: 'string' },
+                  recorded: { type: 'number' },
+                  onchain: { type: 'number' },
+                  discrepancy: { type: 'number' },
+                },
+              },
+            },
+          },
+        },
+        BalanceSnapshot: {
+          type: 'object',
+          properties: {
+            object: { type: 'string', enum: ['balance_snapshot'] },
+            date: { type: 'string' },
+            t: { type: 'integer', description: 'Epoch ms' },
+            principal: { type: 'number' },
+            value: { type: 'number' },
+            accrued: { type: 'number' },
+            positions: { type: 'integer' },
+            users: { type: 'integer' },
+            by_asset: { type: 'array', items: { type: 'object' } },
           },
         },
       },

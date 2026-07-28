@@ -253,3 +253,53 @@ semantically.
 4. CTO: Developer Portal UI (section 7) against the contract.
 5. CTO: integrate, run, verify end-to-end in browser, screenshot.
 6. Critic agent: independent QA review -> iterate.
+
+## 10. Users & Reconciliation (product extension)
+
+A partner integrates on behalf of their own customers. Two capabilities make the
+platform operable for them: identity for end-users, and accounting-grade
+reconciliation of balances.
+
+### 10.1 Users
+
+An end-user of the partner (the wallet holder). The partner maps their own
+customer to a Thesauros user via `external_id`, links one or more wallets, and
+can then query positions and ledger activity per user.
+
+User: `{ id:"usr_...", object:"user", external_id, label?, email?, metadata?,
+  wallets:[], status:"active"|"disabled", created_at, updated_at }`
+
+- `POST /users` (write, idempotent) — create. `external_id` unique; wallets validated.
+- `GET /users` (read, paginated; filter `status`, `wallet`).
+- `GET /users/:id` (read).
+- `PATCH /users/:id` (write) — update label/email/metadata/wallets/status.
+- `GET /users/:id/positions` (read, paginated).
+- `GET /users/:id/ledger` (read, paginated).
+
+Positions gain an optional `user_id` (set via `user` on `POST /positions`,
+accepting a user id or `external_id`).
+
+### 10.2 Reconciliation
+
+Accounting-grade view so the partner can reconcile their books against the
+routing engine and (simulated) on-chain state.
+
+Ledger entry: `{ id:"led_...", object:"ledger_entry", at, user_id?, position_id,
+  wallet, asset, type:"deposit"|"withdraw"|"close"|"accrual", amount (signed),
+  balance_after, vault_id, settled:bool, ref }`
+
+- `GET /reconciliation/ledger` (read, paginated; filter `user_id`, `position_id`,
+  `asset`, `type`) — append-only ledger with running balance per position.
+- `GET /reconciliation/balances` (read; filter `user_id`, `asset`) — current
+  recorded vs on-chain balance per user/asset.
+- `GET /reconciliation/report` (read; `scope=all|usr_...|pos_...`) — reconciliation
+  result: `recorded_total`, `onchain_total`, `discrepancy`, `unsettled_yield`,
+  `status:"reconciled"|"mismatch"`, per-asset breakdown.
+- `GET /reconciliation/snapshots` (read; `from`, `to`, `asset`) — daily balance
+  snapshots for period accounting.
+
+Reconciliation model: `recorded` = sum of live `current_value`. `onchain` =
+accrual settled to the last daily boundary (on-chain indices update discretely),
+so `discrepancy = recorded - onchain` equals the intraday unsettled yield. Within
+tolerance this is `reconciled` and the difference is reported as `unsettled_yield`,
+not an error.
