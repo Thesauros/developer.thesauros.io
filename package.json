@@ -1,0 +1,21 @@
+{
+  "name": "developer-thesauros-io",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Thesauros Developer Platform — developer portal, sandbox REST API and SDKs for institutional yield integration.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check"
+  },
+  "dependencies": {
+    "next": "^16.2.7",
+    "react": "19.2.5",
+    "react-dom": "19.2.5"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.3"
+  }
+}

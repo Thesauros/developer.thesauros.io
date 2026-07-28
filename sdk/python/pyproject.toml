@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thesauros"
+version = "1.0.0"
+description = "Official Python SDK for the Thesauros Developer Platform yield-infrastructure API."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["thesauros", "defi", "yield", "vaults", "sdk", "api"]
+authors = [{ name = "Thesauros" }]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+    "Typing :: Typed",
+]
+# Zero runtime dependencies: the SDK is built entirely on the Python standard
+# library (urllib for HTTP, hmac/hashlib for webhook verification).
+dependencies = []
+
+[project.urls]
+Homepage = "https://developer.thesauros.io"
+Documentation = "https://developer.thesauros.io"
+
+[tool.setuptools]
+packages = ["thesauros"]
+
+[tool.setuptools.package-data]
+thesauros = ["py.typed"]

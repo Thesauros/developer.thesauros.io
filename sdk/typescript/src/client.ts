@@ -1,0 +1,263 @@
+/**
+ * The {@link Thesauros} client and its namespaced resource objects.
+ *
+ * Each resource mirrors a group of API endpoints one-to-one. Resource methods
+ * return the unwrapped envelope `data` directly; envelope `meta`, the request
+ * id, and rate-limit headers from the most recent call are available on
+ * `client.lastResponse` (and `client.lastMeta`).
+ */
+
+import { HttpClient, type ClientConfig, type LastResponse } from './http.js';
+import type {
+  ApiKey,
+  DeletionResult,
+  Delivery,
+  KeyCreateParams,
+  Position,
+  PositionCreateParams,
+  PositionEvent,
+  PositionListParams,
+  PositionWithdrawParams,
+  Rebalance,
+  RebalanceListParams,
+  RevokedKey,
+  Status,
+  Usage,
+  UsageGetParams,
+  Vault,
+  VaultListParams,
+  Webhook,
+  WebhookCreateParams,
+  WebhookEventsParams,
+  Yield,
+} from './types.js';
+
+function enc(segment: string): string {
+  return encodeURIComponent(segment);
+}
+
+/** API key management (`/keys`). */
+export class KeysResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /**
+   * Create a new API key. The full `secret` is returned in plaintext ONLY here;
+   * subsequent list calls mask it. Store it immediately.
+   */
+  create(params: KeyCreateParams): Promise<ApiKey> {
+    return this.http.request<ApiKey>({ method: 'POST', path: 'keys', body: params });
+  }
+
+  /** List all keys. Secrets are masked (e.g. `tsk_test_...a1b2`). */
+  list(): Promise<ApiKey[]> {
+    return this.http.request<ApiKey[]>({ method: 'GET', path: 'keys' });
+  }
+
+  /** Revoke a key by id. Returns `{ id, revoked: true }`. */
+  revoke(id: string): Promise<RevokedKey> {
+    return this.http.request<RevokedKey>({ method: 'DELETE', path: `keys/${enc(id)}` });
+  }
+}
+
+/** Yield vault discovery (`/vaults`). */
+export class VaultsResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /** List vaults, optionally filtered by `asset`, `chain`, and/or `status`. */
+  list(params: VaultListParams = {}): Promise<Vault[]> {
+    return this.http.request<Vault[]>({ method: 'GET', path: 'vaults', query: { ...params } });
+  }
+
+  /** Retrieve a single vault by id. */
+  retrieve(id: string): Promise<Vault> {
+    return this.http.request<Vault>({ method: 'GET', path: `vaults/${enc(id)}` });
+  }
+}
+
+/**
+ * Aggregated yield rates (`/yield`).
+ *
+ * Note: this resource is exposed on the client as `client.yield`. `yield` is a
+ * reserved word, but it is a legal property name, so `client.yield.get(...)`
+ * works. A `client.rates` alias is also provided for tooling that dislikes
+ * reserved-word members.
+ */
+export class YieldResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /**
+   * Fetch yield rates.
+   * - With no argument: `GET /yield` — the aggregated best/blend view.
+   * - With an `asset`: `GET /yield/:asset` — per-asset detail with a per-vault
+   *   `breakdown` and `history`.
+   */
+  get(asset?: string): Promise<Yield> {
+    if (asset !== undefined) {
+      return this.http.request<Yield>({ method: 'GET', path: `yield/${enc(asset)}` });
+    }
+    return this.http.request<Yield>({ method: 'GET', path: 'yield' });
+  }
+}
+
+/** Deployed yield positions (`/positions`). */
+export class PositionsResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /**
+   * Open a new position. `strategy` defaults to `"auto"` server-side; pass a
+   * `vault_id` to pin the position to a specific vault.
+   */
+  create(params: PositionCreateParams): Promise<Position> {
+    return this.http.request<Position>({ method: 'POST', path: 'positions', body: params });
+  }
+
+  /** List positions, optionally filtered by `wallet` and/or `status`. */
+  list(params: PositionListParams = {}): Promise<Position[]> {
+    return this.http.request<Position[]>({ method: 'GET', path: 'positions', query: { ...params } });
+  }
+
+  /** Retrieve a single position by id, with live accrued yield. */
+  retrieve(id: string): Promise<Position> {
+    return this.http.request<Position>({ method: 'GET', path: `positions/${enc(id)}` });
+  }
+
+  /**
+   * Withdraw from a position. Pass `{ amount }` for a partial withdrawal or
+   * `{ all: true }` to close it out entirely.
+   */
+  withdraw(id: string, params: PositionWithdrawParams = {}): Promise<Position> {
+    return this.http.request<Position>({
+      method: 'POST',
+      path: `positions/${enc(id)}/withdraw`,
+      body: params,
+    });
+  }
+
+  /** Retrieve the event history for a position. */
+  history(id: string): Promise<PositionEvent[]> {
+    return this.http.request<PositionEvent[]>({
+      method: 'GET',
+      path: `positions/${enc(id)}/history`,
+    });
+  }
+}
+
+/** Rebalance activity (`/rebalances`). */
+export class RebalancesResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /** List rebalances, optionally scoped to a single `position_id`. */
+  list(params: RebalanceListParams = {}): Promise<Rebalance[]> {
+    return this.http.request<Rebalance[]>({ method: 'GET', path: 'rebalances', query: { ...params } });
+  }
+}
+
+/** Webhook endpoint management (`/webhooks`). */
+export class WebhooksResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /** Register a webhook endpoint subscribed to the given `events`. */
+  create(params: WebhookCreateParams): Promise<Webhook> {
+    return this.http.request<Webhook>({ method: 'POST', path: 'webhooks', body: params });
+  }
+
+  /** List registered webhook endpoints. */
+  list(): Promise<Webhook[]> {
+    return this.http.request<Webhook[]>({ method: 'GET', path: 'webhooks' });
+  }
+
+  /** Delete a webhook endpoint by id. */
+  delete(id: string): Promise<DeletionResult> {
+    return this.http.request<DeletionResult>({ method: 'DELETE', path: `webhooks/${enc(id)}` });
+  }
+
+  /** Dispatch a synthetic test event to the endpoint; returns the delivery record. */
+  test(id: string): Promise<Delivery> {
+    return this.http.request<Delivery>({ method: 'POST', path: `webhooks/${enc(id)}/test` });
+  }
+
+  /** Retrieve the delivery event log, optionally filtered by `webhook_id`. */
+  events(params: WebhookEventsParams = {}): Promise<Delivery[]> {
+    return this.http.request<Delivery[]>({
+      method: 'GET',
+      path: 'webhooks/events',
+      query: { ...params },
+    });
+  }
+}
+
+/** API usage telemetry (`/usage`). */
+export class UsageResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /** Fetch usage telemetry for a `range` (`24h` | `7d` | `30d`). */
+  get(params: UsageGetParams = {}): Promise<Usage> {
+    return this.http.request<Usage>({ method: 'GET', path: 'usage', query: { ...params } });
+  }
+}
+
+/** Platform health (`/status`). */
+export class StatusResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /** Fetch overall platform health, component status, and incidents. */
+  get(): Promise<Status> {
+    return this.http.request<Status>({ method: 'GET', path: 'status' });
+  }
+}
+
+/**
+ * Thesauros Developer Platform API client.
+ *
+ * @example
+ * import { Thesauros } from '@thesauros/sdk';
+ *
+ * const client = new Thesauros({ apiKey: 'tsk_test_...' });
+ * const vaults = await client.vaults.list({ asset: 'USDC' });
+ * const rates = await client.yield.get('USDC');
+ * const pos = await client.positions.create({ wallet, asset: 'USDC', amount: 1000 });
+ * await client.positions.withdraw(pos.id, { all: true });
+ */
+export class Thesauros {
+  readonly keys: KeysResource;
+  readonly vaults: VaultsResource;
+  /** Yield rates. `yield` is a reserved word but a legal property name. See also {@link rates}. */
+  readonly yield: YieldResource;
+  readonly positions: PositionsResource;
+  readonly rebalances: RebalancesResource;
+  readonly webhooks: WebhooksResource;
+  readonly usage: UsageResource;
+  readonly status: StatusResource;
+
+  private readonly http: HttpClient;
+
+  constructor(config: ClientConfig) {
+    this.http = new HttpClient(config);
+    this.keys = new KeysResource(this.http);
+    this.vaults = new VaultsResource(this.http);
+    this.yield = new YieldResource(this.http);
+    this.positions = new PositionsResource(this.http);
+    this.rebalances = new RebalancesResource(this.http);
+    this.webhooks = new WebhooksResource(this.http);
+    this.usage = new UsageResource(this.http);
+    this.status = new StatusResource(this.http);
+  }
+
+  /**
+   * Alias for {@link yield}, provided for environments/tooling that handle
+   * reserved-word property names awkwardly. Both reference the same resource.
+   */
+  get rates(): YieldResource {
+    return this.yield;
+  }
+
+  /** Metadata (status, object, meta, request id, rate limits) from the last call. */
+  get lastResponse(): LastResponse | null {
+    return this.http.lastResponse;
+  }
+
+  /** Convenience accessor for the envelope `meta` of the last call, if any. */
+  get lastMeta(): Record<string, unknown> | undefined {
+    return this.http.lastResponse?.meta;
+  }
+}

@@ -1,0 +1,18 @@
+/* Minimal global reset. The portal's full design system lives in
+   platform.module.css, scoped under .shell. */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: #0a0f1e;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
