@@ -14,11 +14,13 @@ export * from './errors.js';
 export {
   Thesauros,
   KeysResource,
+  UsersResource,
   VaultsResource,
   YieldResource,
   PositionsResource,
   RebalancesResource,
   WebhooksResource,
+  ReconciliationResource,
   UsageResource,
   StatusResource,
 } from './client.js';

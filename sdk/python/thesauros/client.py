@@ -6,20 +6,25 @@ envelope ``meta``, the request id, and rate-limit headers from the most recent
 call are available on ``client.last_response`` (and ``client.last_meta``).
 """
 
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
 from ._http import HttpClient
 from .types import (
     ApiKey,
+    Balance,
+    BalanceSnapshot,
     DeletionResult,
     Delivery,
+    LedgerEntry,
     Position,
     PositionEvent,
     Rebalance,
+    Reconciliation,
     RevokedKey,
     Status,
     Usage,
+    User,
     Vault,
     Webhook,
     Yield,
@@ -218,6 +223,168 @@ class StatusResource:
         return self._http.request("GET", "status")
 
 
+class UsersResource:
+    """Platform users (``/users``)."""
+
+    def __init__(self, http: HttpClient) -> None:
+        self._http = http
+
+    def create(
+        self,
+        external_id: str,
+        label: Optional[str] = None,
+        email: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        wallets: Optional[List[str]] = None,
+    ) -> User:
+        """Create a user keyed by your own ``external_id``.
+
+        Optionally attach a ``label``, ``email``, free-form ``metadata``, and one
+        or more ``wallets``.
+        """
+        body: dict = {"external_id": external_id}
+        if label is not None:
+            body["label"] = label
+        if email is not None:
+            body["email"] = email
+        if metadata is not None:
+            body["metadata"] = metadata
+        if wallets is not None:
+            body["wallets"] = wallets
+        return self._http.request("POST", "users", body=body)
+
+    def list(
+        self,
+        status: Optional[str] = None,
+        wallet: Optional[str] = None,
+        limit: Optional[int] = None,
+        cursor: Optional[str] = None,
+    ) -> List[User]:
+        """List users, optionally filtered by ``status`` and/or ``wallet``."""
+        return self._http.request(
+            "GET",
+            "users",
+            query={"status": status, "wallet": wallet, "limit": limit, "cursor": cursor},
+        )
+
+    def retrieve(self, id: str) -> User:  # noqa: A002 - mirrors the API field name
+        """Retrieve a single user by id."""
+        return self._http.request("GET", f"users/{_enc(id)}")
+
+    def update(
+        self,
+        id: str,  # noqa: A002 - mirrors the API field name
+        label: Optional[str] = None,
+        email: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        wallets: Optional[List[str]] = None,
+        status: Optional[str] = None,
+    ) -> User:
+        """Update mutable user fields. Only the provided fields are changed."""
+        body: dict = {}
+        if label is not None:
+            body["label"] = label
+        if email is not None:
+            body["email"] = email
+        if metadata is not None:
+            body["metadata"] = metadata
+        if wallets is not None:
+            body["wallets"] = wallets
+        if status is not None:
+            body["status"] = status
+        return self._http.request("PATCH", f"users/{_enc(id)}", body=body)
+
+    def positions(
+        self,
+        id: str,  # noqa: A002 - mirrors the API field name
+        status: Optional[str] = None,
+        limit: Optional[int] = None,
+        cursor: Optional[str] = None,
+    ) -> List[Position]:
+        """List the positions belonging to a user."""
+        return self._http.request(
+            "GET",
+            f"users/{_enc(id)}/positions",
+            query={"status": status, "limit": limit, "cursor": cursor},
+        )
+
+    def ledger(
+        self,
+        id: str,  # noqa: A002 - mirrors the API field name
+        asset: Optional[str] = None,
+        type: Optional[str] = None,  # noqa: A001,A002 - mirrors the API field name
+        limit: Optional[int] = None,
+        cursor: Optional[str] = None,
+    ) -> List[LedgerEntry]:
+        """List the ledger entries belonging to a user."""
+        return self._http.request(
+            "GET",
+            f"users/{_enc(id)}/ledger",
+            query={"asset": asset, "type": type, "limit": limit, "cursor": cursor},
+        )
+
+
+class ReconciliationResource:
+    """Reconciliation (``/reconciliation``)."""
+
+    def __init__(self, http: HttpClient) -> None:
+        self._http = http
+
+    def ledger(
+        self,
+        user_id: Optional[str] = None,
+        position_id: Optional[str] = None,
+        asset: Optional[str] = None,
+        type: Optional[str] = None,  # noqa: A001,A002 - mirrors the API field name
+        limit: Optional[int] = None,
+        cursor: Optional[str] = None,
+    ) -> List[LedgerEntry]:
+        """Query the global ledger, optionally scoped by user/position/asset/type."""
+        return self._http.request(
+            "GET",
+            "reconciliation/ledger",
+            query={
+                "user_id": user_id,
+                "position_id": position_id,
+                "asset": asset,
+                "type": type,
+                "limit": limit,
+                "cursor": cursor,
+            },
+        )
+
+    def balances(
+        self,
+        user_id: Optional[str] = None,
+        asset: Optional[str] = None,
+    ) -> List[Balance]:
+        """List aggregated balances, optionally scoped to a ``user_id`` and/or ``asset``."""
+        return self._http.request(
+            "GET", "reconciliation/balances", query={"user_id": user_id, "asset": asset}
+        )
+
+    def report(self, scope: Optional[str] = None) -> Reconciliation:
+        """Fetch a reconciliation of recorded vs. on-chain balances for a ``scope``."""
+        return self._http.request("GET", "reconciliation/report", query={"scope": scope})
+
+    def snapshots(
+        self,
+        from_: Optional[str] = None,
+        to: Optional[str] = None,
+        asset: Optional[str] = None,
+    ) -> List[BalanceSnapshot]:
+        """List historical balance snapshots.
+
+        ``from_`` maps to the ``from`` query parameter (``from`` is a Python
+        keyword); ``to`` and ``asset`` optionally bound the range.
+        """
+        return self._http.request(
+            "GET",
+            "reconciliation/snapshots",
+            query={"from": from_, "to": to, "asset": asset},
+        )
+
+
 class Thesauros:
     """Thesauros Developer Platform API client.
 
@@ -258,6 +425,8 @@ class Thesauros:
         self.webhooks = WebhooksResource(self._http)
         self.usage = UsageResource(self._http)
         self.status = StatusResource(self._http)
+        self.users = UsersResource(self._http)
+        self.reconciliation = ReconciliationResource(self._http)
 
     @property
     def last_response(self) -> Any:
