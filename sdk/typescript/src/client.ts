@@ -12,6 +12,7 @@ import type {
   ApiKey,
   Balance,
   BalanceSnapshot,
+  CreateOptions,
   DeletionResult,
   Delivery,
   KeyCreateParams,
@@ -50,6 +51,11 @@ function enc(segment: string): string {
   return encodeURIComponent(segment);
 }
 
+/** Build extra headers from create options (currently: Idempotency-Key). */
+function createHeaders(options?: CreateOptions): Record<string, string> | undefined {
+  return options?.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : undefined;
+}
+
 /** API key management (`/keys`). */
 export class KeysResource {
   constructor(private readonly http: HttpClient) {}
@@ -58,8 +64,13 @@ export class KeysResource {
    * Create a new API key. The full `secret` is returned in plaintext ONLY here;
    * subsequent list calls mask it. Store it immediately.
    */
-  create(params: KeyCreateParams): Promise<ApiKey> {
-    return this.http.request<ApiKey>({ method: 'POST', path: 'keys', body: params });
+  create(params: KeyCreateParams, options?: CreateOptions): Promise<ApiKey> {
+    return this.http.request<ApiKey>({
+      method: 'POST',
+      path: 'keys',
+      body: params,
+      headers: createHeaders(options),
+    });
   }
 
   /** List all keys. Secrets are masked (e.g. `tsk_test_...a1b2`). */
@@ -121,8 +132,13 @@ export class PositionsResource {
    * Open a new position. `strategy` defaults to `"auto"` server-side; pass a
    * `vault_id` to pin the position to a specific vault.
    */
-  create(params: PositionCreateParams): Promise<Position> {
-    return this.http.request<Position>({ method: 'POST', path: 'positions', body: params });
+  create(params: PositionCreateParams, options?: CreateOptions): Promise<Position> {
+    return this.http.request<Position>({
+      method: 'POST',
+      path: 'positions',
+      body: params,
+      headers: createHeaders(options),
+    });
   }
 
   /** List positions, optionally filtered by `wallet` and/or `status`. */
@@ -171,8 +187,13 @@ export class WebhooksResource {
   constructor(private readonly http: HttpClient) {}
 
   /** Register a webhook endpoint subscribed to the given `events`. */
-  create(params: WebhookCreateParams): Promise<Webhook> {
-    return this.http.request<Webhook>({ method: 'POST', path: 'webhooks', body: params });
+  create(params: WebhookCreateParams, options?: CreateOptions): Promise<Webhook> {
+    return this.http.request<Webhook>({
+      method: 'POST',
+      path: 'webhooks',
+      body: params,
+      headers: createHeaders(options),
+    });
   }
 
   /** List registered webhook endpoints. */
@@ -228,8 +249,13 @@ export class UsersResource {
    * Create a user keyed by your own `external_id`. Optionally attach a `label`,
    * `email`, free-form `metadata`, and one or more `wallets`.
    */
-  create(params: UserCreateParams): Promise<User> {
-    return this.http.request<User>({ method: 'POST', path: 'users', body: params });
+  create(params: UserCreateParams, options?: CreateOptions): Promise<User> {
+    return this.http.request<User>({
+      method: 'POST',
+      path: 'users',
+      body: params,
+      headers: createHeaders(options),
+    });
   }
 
   /** List users, optionally filtered by `status` and/or `wallet`. */

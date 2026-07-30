@@ -8,6 +8,21 @@
  */
 
 /* -------------------------------------------------------------------------- */
+/* Request options                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Optional controls for mutating (create) requests.
+ */
+export interface CreateOptions {
+  /**
+   * Idempotency key. Retrying a create with the same key replays the original
+   * response instead of producing a duplicate resource.
+   */
+  idempotencyKey?: string;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Envelopes                                                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -505,12 +520,15 @@ export interface PositionCreateParams {
   asset: Asset;
   amount: number;
   strategy?: PositionStrategy;
+  /** Optional end-user association: a user id (`usr_...`) or `external_id`. */
+  user?: string;
 }
 
 /** Query for `GET /positions`. All filters are optional. */
 export interface PositionListParams {
   wallet?: string;
   status?: PositionStatus;
+  user_id?: string;
 }
 
 /**

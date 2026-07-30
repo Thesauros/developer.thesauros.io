@@ -67,6 +67,8 @@ export interface RequestOptions {
   path: string;
   query?: Record<string, string | number | boolean | undefined>;
   body?: unknown;
+  /** Extra request headers (e.g. `Idempotency-Key`). Merged over the defaults. */
+  headers?: Record<string, string>;
 }
 
 /** Loosely-typed view of a parsed envelope used only inside the transport. */
@@ -155,6 +157,7 @@ export class HttpClient {
       Accept: 'application/json',
     };
     if (hasBody) headers['Content-Type'] = 'application/json';
+    if (opts.headers) Object.assign(headers, opts.headers);
     const payload = hasBody ? JSON.stringify(opts.body) : undefined;
 
     let attempt = 0;

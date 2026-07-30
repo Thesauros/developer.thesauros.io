@@ -36,19 +36,26 @@ def _enc(segment: str) -> str:
     return quote(str(segment), safe="")
 
 
+def _idem_headers(idempotency_key: Optional[str]) -> Optional[Dict[str, str]]:
+    """Build extra headers from an idempotency key (or ``None``)."""
+    return {"Idempotency-Key": idempotency_key} if idempotency_key else None
+
+
 class KeysResource:
     """API key management (``/keys``)."""
 
     def __init__(self, http: HttpClient) -> None:
         self._http = http
 
-    def create(self, label: str) -> ApiKey:
+    def create(self, label: str, idempotency_key: Optional[str] = None) -> ApiKey:
         """Create a new API key.
 
         The full ``secret`` is returned in plaintext ONLY here; subsequent list
         calls mask it. Store it immediately.
         """
-        return self._http.request("POST", "keys", body={"label": label})
+        return self._http.request(
+            "POST", "keys", body={"label": label}, headers=_idem_headers(idempotency_key)
+        )
 
     def list(self) -> List[ApiKey]:
         """List all keys. Secrets are masked (e.g. ``tsk_test_...a1b2``)."""
@@ -115,25 +122,33 @@ class PositionsResource:
         asset: str,
         amount: float,
         strategy: Optional[str] = None,
+        user: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
     ) -> Position:
         """Open a new position.
 
         ``strategy`` defaults to ``"auto"`` server-side; pass a ``vault_id`` to
-        pin the position to a specific vault.
+        pin the position to a specific vault. ``user`` optionally associates the
+        position with an end-user (user id or ``external_id``).
         """
         body = {"wallet": wallet, "asset": asset, "amount": amount}
         if strategy is not None:
             body["strategy"] = strategy
-        return self._http.request("POST", "positions", body=body)
+        if user is not None:
+            body["user"] = user
+        return self._http.request(
+            "POST", "positions", body=body, headers=_idem_headers(idempotency_key)
+        )
 
     def list(
         self,
         wallet: Optional[str] = None,
         status: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> List[Position]:
-        """List positions, optionally filtered by ``wallet`` and/or ``status``."""
+        """List positions, optionally filtered by ``wallet``, ``status`` and/or ``user_id``."""
         return self._http.request(
-            "GET", "positions", query={"wallet": wallet, "status": status}
+            "GET", "positions", query={"wallet": wallet, "status": status, "user_id": user_id}
         )
 
     def retrieve(self, id: str) -> Position:  # noqa: A002 - mirrors the API field name
@@ -180,9 +195,12 @@ class WebhooksResource:
     def __init__(self, http: HttpClient) -> None:
         self._http = http
 
-    def create(self, url: str, events: List[str]) -> Webhook:
+    def create(self, url: str, events: List[str], idempotency_key: Optional[str] = None) -> Webhook:
         """Register a webhook endpoint subscribed to the given ``events``."""
-        return self._http.request("POST", "webhooks", body={"url": url, "events": events})
+        return self._http.request(
+            "POST", "webhooks", body={"url": url, "events": events},
+            headers=_idem_headers(idempotency_key),
+        )
 
     def list(self) -> List[Webhook]:
         """List registered webhook endpoints."""
@@ -236,6 +254,7 @@ class UsersResource:
         email: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         wallets: Optional[List[str]] = None,
+        idempotency_key: Optional[str] = None,
     ) -> User:
         """Create a user keyed by your own ``external_id``.
 
@@ -251,7 +270,9 @@ class UsersResource:
             body["metadata"] = metadata
         if wallets is not None:
             body["wallets"] = wallets
-        return self._http.request("POST", "users", body=body)
+        return self._http.request(
+            "POST", "users", body=body, headers=_idem_headers(idempotency_key)
+        )
 
     def list(
         self,

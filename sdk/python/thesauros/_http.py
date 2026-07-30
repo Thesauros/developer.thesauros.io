@@ -100,26 +100,30 @@ class HttpClient:
         path: str,
         query: Optional[Dict[str, Any]] = None,
         body: Optional[Any] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Any:
         """Execute a request, unwrap the envelope, and return ``data``.
 
         Envelope ``meta``, the request id, and rate-limit headers are recorded
-        on :attr:`last_response`.
+        on :attr:`last_response`. Extra ``headers`` (e.g. ``Idempotency-Key``)
+        are merged over the defaults.
         """
         url = self._build_url(path, query)
         data = json.dumps(body).encode("utf-8") if body is not None else None
-        headers = {
+        req_headers = {
             "Authorization": f"Bearer {self.api_key}",
             "User-Agent": USER_AGENT,
             "Accept": "application/json",
         }
         if data is not None:
-            headers["Content-Type"] = "application/json"
+            req_headers["Content-Type"] = "application/json"
+        if headers:
+            req_headers.update(headers)
 
         attempt = 0
         # Loop performs at most ``max_retries + 1`` total attempts.
         while True:
-            req = urllib.request.Request(url, data=data, headers=headers, method=method)
+            req = urllib.request.Request(url, data=data, headers=req_headers, method=method)
             status, resp_headers, raw = self._send(req)
 
             request_id = resp_headers.get("X-Request-Id")
