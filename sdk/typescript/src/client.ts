@@ -9,10 +9,16 @@
 
 import { HttpClient, type ClientConfig, type LastResponse } from './http.js';
 import type {
+  Advisor,
+  AnalyticsDecisionsParams,
+  AnalyticsRegimeParams,
+  AnalyticsSignalsParams,
+  AnalyticsUpliftParams,
   ApiKey,
   Balance,
   BalanceSnapshot,
   CreateOptions,
+  Decision,
   DeletionResult,
   Delivery,
   KeyCreateParams,
@@ -29,8 +35,11 @@ import type {
   ReconciliationLedgerParams,
   ReconciliationReportParams,
   ReconciliationSnapshotsParams,
+  Regime,
   RevokedKey,
+  Signal,
   Status,
+  UpliftReport,
   Usage,
   UsageGetParams,
   User,
@@ -333,6 +342,55 @@ export class ReconciliationResource {
   }
 }
 
+/** Analytics & insights (`/analytics`). All methods are read-only. */
+export class AnalyticsResource {
+  constructor(private readonly http: HttpClient) {}
+
+  /**
+   * Fetch the uplift report comparing routed portfolio value against the
+   * Aave-only and hold baselines, optionally scoped by `user_id` and/or `asset`.
+   */
+  uplift(params: AnalyticsUpliftParams = {}): Promise<UpliftReport> {
+    return this.http.request<UpliftReport>({
+      method: 'GET',
+      path: 'analytics/uplift',
+      query: { ...params },
+    });
+  }
+
+  /** List routing/rebalance decisions, optionally scoped and paginated. */
+  decisions(params: AnalyticsDecisionsParams = {}): Promise<Decision[]> {
+    return this.http.request<Decision[]>({
+      method: 'GET',
+      path: 'analytics/decisions',
+      query: { ...params },
+    });
+  }
+
+  /** List per-vault yield signals, optionally filtered by `asset`. */
+  signals(params: AnalyticsSignalsParams = {}): Promise<Signal[]> {
+    return this.http.request<Signal[]>({
+      method: 'GET',
+      path: 'analytics/signals',
+      query: { ...params },
+    });
+  }
+
+  /** Fetch the current market regime, optionally for a single `asset`. */
+  regime(params: AnalyticsRegimeParams = {}): Promise<Regime> {
+    return this.http.request<Regime>({
+      method: 'GET',
+      path: 'analytics/regime',
+      query: { ...params },
+    });
+  }
+
+  /** Fetch the human-readable advisory (headline, regime, opportunities, portfolio). */
+  advisor(): Promise<Advisor> {
+    return this.http.request<Advisor>({ method: 'GET', path: 'analytics/advisor' });
+  }
+}
+
 /**
  * Thesauros Developer Platform API client.
  *
@@ -357,6 +415,7 @@ export class Thesauros {
   readonly status: StatusResource;
   readonly users: UsersResource;
   readonly reconciliation: ReconciliationResource;
+  readonly analytics: AnalyticsResource;
 
   private readonly http: HttpClient;
 
@@ -372,6 +431,7 @@ export class Thesauros {
     this.status = new StatusResource(this.http);
     this.users = new UsersResource(this.http);
     this.reconciliation = new ReconciliationResource(this.http);
+    this.analytics = new AnalyticsResource(this.http);
   }
 
   /**

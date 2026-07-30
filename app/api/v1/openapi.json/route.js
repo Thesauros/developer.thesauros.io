@@ -130,6 +130,7 @@ function buildDoc() {
       { name: 'rebalances', description: 'Rebalance history' },
       { name: 'webhooks', description: 'Webhook endpoints & events' },
       { name: 'reconciliation', description: 'Ledger, balances & reconciliation' },
+      { name: 'analytics', description: 'Uplift, decision log, signals, regime & advisor' },
       { name: 'telemetry', description: 'Usage & status' },
     ],
     security: AUTH,
@@ -422,6 +423,59 @@ function buildDoc() {
             q('asset', 'Filter by asset', { enum: ['USDC', 'USDT'] }),
           ],
           responses: withErrors({ 200: listOf('BalanceSnapshot', 'Daily snapshots') }, [401, 429, 500]),
+        },
+      },
+      '/analytics/uplift': {
+        get: {
+          tags: ['analytics'],
+          summary: 'Uplift vs baselines',
+          description:
+            'Routed portfolio value versus passive baselines (Aave-only and hold-original-vault). The concept\u2019s primary proof point.',
+          parameters: [q('user_id', 'Scope to a user'), q('asset', 'Filter by asset', { enum: ['USDC', 'USDT'] })],
+          responses: withErrors({ 200: single('UpliftReport', 'Uplift report') }, [401, 429, 500]),
+        },
+      },
+      '/analytics/decisions': {
+        get: {
+          tags: ['analytics'],
+          summary: 'Decision log',
+          description:
+            'Explainable log of routing and rebalance decisions: inputs, alternatives considered, expected uplift and rationale.',
+          parameters: [
+            q('user_id', 'Filter by user'),
+            q('position_id', 'Filter by position'),
+            q('asset', 'Filter by asset', { enum: ['USDC', 'USDT'] }),
+            ...paginationParams(),
+          ],
+          responses: withErrors({ 200: listOf('Decision', 'Decisions, newest first') }, [401, 429, 500]),
+        },
+      },
+      '/analytics/signals': {
+        get: {
+          tags: ['analytics'],
+          summary: 'Risk-adjusted signals',
+          description:
+            'Per-vault risk-adjusted APY (APY discounted by risk tier and volatility) with a naive trend forecast and a recommendation. Ranked.',
+          parameters: [q('asset', 'Filter by asset', { enum: ['USDC', 'USDT'] })],
+          responses: withErrors({ 200: listOf('Signal', 'Signals, best risk-adjusted first') }, [401, 429, 500]),
+        },
+      },
+      '/analytics/regime': {
+        get: {
+          tags: ['analytics'],
+          summary: 'Market regime',
+          description: 'Classifies the current rate regime (rising/falling/stable/volatile) from recent yield trend and volatility.',
+          parameters: [q('asset', 'Restrict to one asset', { enum: ['USDC', 'USDT'] })],
+          responses: withErrors({ 200: single('Regime', 'Regime classification') }, [401, 429, 500]),
+        },
+      },
+      '/analytics/advisor': {
+        get: {
+          tags: ['analytics'],
+          summary: 'Strategy advisor',
+          description:
+            'Template-generated (non-LLM) strategy summary: regime, top risk-adjusted opportunities, portfolio uplift and rationale bullets.',
+          responses: withErrors({ 200: single('Advisor', 'Advisor summary') }, [401, 429, 500]),
         },
       },
       '/usage': {
@@ -838,6 +892,155 @@ function buildDoc() {
             positions: { type: 'integer' },
             users: { type: 'integer' },
             by_asset: { type: 'array', items: { type: 'object' } },
+          },
+        },
+        Signal: {
+          type: 'object',
+          description: 'Per-vault risk-adjusted signal. APY fields are decimal fractions.',
+          properties: {
+            object: { type: 'string', enum: ['signal'] },
+            vault_id: { type: 'string' },
+            name: { type: 'string' },
+            provider: { type: 'string' },
+            asset: { type: 'string', enum: ['USDC', 'USDT'] },
+            chain: { type: 'string' },
+            risk_tier: { type: 'string', enum: ['bluechip', 'core', 'opportunistic'] },
+            apy: { type: 'number' },
+            volatility: { type: 'number' },
+            trend_slope_bps_day: { type: 'number' },
+            forecast_apy: { type: 'number', description: 'Naive 7-day trend forecast (decimal fraction)' },
+            risk_factor: { type: 'number' },
+            risk_adjusted_apy: { type: 'number' },
+            rank: { type: 'integer' },
+            recommendation: { type: 'string', enum: ['overweight', 'neutral', 'underweight'] },
+          },
+        },
+        Regime: {
+          type: 'object',
+          properties: {
+            object: { type: 'string', enum: ['regime'] },
+            as_of: { type: 'string', format: 'date-time' },
+            regime: { type: 'string', enum: ['rising', 'falling', 'stable', 'volatile'] },
+            description: { type: 'string' },
+            per_asset: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  asset: { type: 'string' },
+                  regime: { type: 'string', enum: ['rising', 'falling', 'stable', 'volatile'] },
+                  blend_apy: { type: 'number' },
+                  trend_slope_bps_day: { type: 'number' },
+                  volatility: { type: 'number' },
+                },
+              },
+            },
+          },
+        },
+        UpliftRow: {
+          type: 'object',
+          properties: {
+            object: { type: 'string', enum: ['uplift_row'] },
+            position_id: { type: 'string' },
+            user_id: { type: ['string', 'null'] },
+            asset: { type: 'string' },
+            vault_id: { type: 'string' },
+            principal: { type: 'number' },
+            current_value: { type: 'number' },
+            apy: { type: 'number' },
+            aave_baseline: { type: 'number' },
+            baseline_apy: { type: 'number' },
+            hold_baseline: { type: 'number' },
+            uplift_vs_aave: { type: 'number' },
+            uplift_vs_hold: { type: 'number' },
+          },
+        },
+        UpliftReport: {
+          type: 'object',
+          properties: {
+            object: { type: 'string', enum: ['uplift'] },
+            as_of: { type: 'string', format: 'date-time' },
+            scope: { type: 'string' },
+            totals: {
+              type: 'object',
+              properties: {
+                principal: { type: 'number' },
+                current_value: { type: 'number' },
+                aave_baseline: { type: 'number' },
+                hold_baseline: { type: 'number' },
+                uplift_vs_aave: { type: 'number' },
+                uplift_vs_hold: { type: 'number' },
+                uplift_vs_aave_pct: { type: 'number' },
+              },
+            },
+            positions: { type: 'array', items: ref('UpliftRow') },
+          },
+        },
+        Decision: {
+          type: 'object',
+          properties: {
+            object: { type: 'string', enum: ['decision'] },
+            id: { type: 'string' },
+            at: { type: 'string', format: 'date-time' },
+            position_id: { type: 'string' },
+            user_id: { type: ['string', 'null'] },
+            asset: { type: 'string' },
+            type: { type: 'string', enum: ['initial_routing', 'rebalance'] },
+            from_vault: { type: ['string', 'null'] },
+            to_vault: { type: 'string' },
+            apy_before: { type: ['number', 'null'] },
+            apy_after: { type: 'number' },
+            expected_uplift_bps: { type: ['number', 'null'] },
+            reason: { type: 'string' },
+            alternatives: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  vault_id: { type: 'string' },
+                  name: { type: 'string' },
+                  provider: { type: 'string' },
+                  apy: { type: 'number' },
+                  risk_tier: { type: 'string' },
+                },
+              },
+            },
+            rationale: { type: 'string' },
+            status: { type: 'string' },
+          },
+        },
+        Advisor: {
+          type: 'object',
+          properties: {
+            object: { type: 'string', enum: ['advisor'] },
+            as_of: { type: 'string', format: 'date-time' },
+            headline: { type: 'string' },
+            regime: { type: 'string' },
+            bullets: { type: 'array', items: { type: 'string' } },
+            top_opportunities: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  vault_id: { type: 'string' },
+                  name: { type: 'string' },
+                  asset: { type: 'string' },
+                  risk_adjusted_apy: { type: 'number' },
+                  forecast_apy: { type: 'number' },
+                  recommendation: { type: 'string' },
+                },
+              },
+            },
+            portfolio: {
+              type: 'object',
+              properties: {
+                current_value: { type: 'number' },
+                uplift_vs_aave: { type: 'number' },
+                uplift_vs_aave_pct: { type: 'number' },
+                positions: { type: 'integer' },
+              },
+            },
+            disclaimer: { type: 'string' },
           },
         },
       },

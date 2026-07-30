@@ -11,9 +11,11 @@ from urllib.parse import quote
 
 from ._http import HttpClient
 from .types import (
+    Advisor,
     ApiKey,
     Balance,
     BalanceSnapshot,
+    Decision,
     DeletionResult,
     Delivery,
     LedgerEntry,
@@ -21,8 +23,11 @@ from .types import (
     PositionEvent,
     Rebalance,
     Reconciliation,
+    Regime,
     RevokedKey,
+    Signal,
     Status,
+    UpliftReport,
     Usage,
     User,
     Vault,
@@ -406,6 +411,59 @@ class ReconciliationResource:
         )
 
 
+class AnalyticsResource:
+    """Analytics & insights (``/analytics``). All methods are read-only."""
+
+    def __init__(self, http: HttpClient) -> None:
+        self._http = http
+
+    def uplift(
+        self,
+        user_id: Optional[str] = None,
+        asset: Optional[str] = None,
+    ) -> UpliftReport:
+        """Fetch the uplift report vs. the Aave-only and hold baselines.
+
+        Optionally scoped by ``user_id`` and/or ``asset``.
+        """
+        return self._http.request(
+            "GET", "analytics/uplift", query={"user_id": user_id, "asset": asset}
+        )
+
+    def decisions(
+        self,
+        user_id: Optional[str] = None,
+        position_id: Optional[str] = None,
+        asset: Optional[str] = None,
+        limit: Optional[int] = None,
+        cursor: Optional[str] = None,
+    ) -> List[Decision]:
+        """List routing/rebalance decisions, optionally scoped and paginated."""
+        return self._http.request(
+            "GET",
+            "analytics/decisions",
+            query={
+                "user_id": user_id,
+                "position_id": position_id,
+                "asset": asset,
+                "limit": limit,
+                "cursor": cursor,
+            },
+        )
+
+    def signals(self, asset: Optional[str] = None) -> List[Signal]:
+        """List per-vault yield signals, optionally filtered by ``asset``."""
+        return self._http.request("GET", "analytics/signals", query={"asset": asset})
+
+    def regime(self, asset: Optional[str] = None) -> Regime:
+        """Fetch the current market regime, optionally for a single ``asset``."""
+        return self._http.request("GET", "analytics/regime", query={"asset": asset})
+
+    def advisor(self) -> Advisor:
+        """Fetch the human-readable advisory (headline, regime, opportunities, portfolio)."""
+        return self._http.request("GET", "analytics/advisor")
+
+
 class Thesauros:
     """Thesauros Developer Platform API client.
 
@@ -448,6 +506,7 @@ class Thesauros:
         self.status = StatusResource(self._http)
         self.users = UsersResource(self._http)
         self.reconciliation = ReconciliationResource(self._http)
+        self.analytics = AnalyticsResource(self._http)
 
     @property
     def last_response(self) -> Any:

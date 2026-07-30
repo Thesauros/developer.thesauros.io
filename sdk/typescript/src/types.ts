@@ -499,6 +499,185 @@ export interface BalanceSnapshot {
 }
 
 /* -------------------------------------------------------------------------- */
+/* 4.11 Analytics                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** A vault's directional recommendation derived from its signal. */
+export type SignalRecommendation = 'overweight' | 'neutral' | 'underweight';
+
+/** The prevailing interest-rate regime for an asset (or the market overall). */
+export type MarketRegime = 'rising' | 'falling' | 'stable' | 'volatile';
+
+/** The kind of routing decision recorded by the engine. */
+export type DecisionType = 'initial_routing' | 'rebalance';
+
+/**
+ * A per-vault yield signal. All `*_apy` fields, `volatility`, and `risk_factor`
+ * are decimal fractions (`0.0642` == 6.42%); `trend_slope_bps_day` is a slope in
+ * basis points per day.
+ */
+export interface Signal {
+  object: 'signal';
+  vault_id: string;
+  name: string;
+  provider: VaultProvider;
+  asset: Asset;
+  chain: Chain;
+  risk_tier: RiskTier;
+  /** Current APY as a decimal fraction (`0.0642` == 6.42%). */
+  apy: number;
+  /** APY volatility as a decimal fraction. */
+  volatility: number;
+  /** Trend slope in basis points per day. */
+  trend_slope_bps_day: number;
+  /** Forecast APY as a decimal fraction. */
+  forecast_apy: number;
+  /** Multiplicative risk factor applied to derive the risk-adjusted APY. */
+  risk_factor: number;
+  /** Risk-adjusted APY as a decimal fraction. */
+  risk_adjusted_apy: number;
+  /** Rank across all vaults (1 = best). */
+  rank: number;
+  recommendation: SignalRecommendation;
+}
+
+/** Per-asset contribution to a market regime report. */
+export interface RegimeAsset {
+  asset: string;
+  regime: MarketRegime;
+  /** Blended APY as a decimal fraction (`0.0642` == 6.42%). */
+  blend_apy: number;
+  /** Trend slope in basis points per day. */
+  trend_slope_bps_day: number;
+  /** APY volatility as a decimal fraction. */
+  volatility: number;
+}
+
+/** The current market regime and its per-asset breakdown. */
+export interface Regime {
+  object: 'regime';
+  /** ISO-8601 timestamp the regime was computed at. */
+  as_of: string;
+  regime: MarketRegime;
+  description: string;
+  per_asset: RegimeAsset[];
+}
+
+/** Aggregate totals for an uplift report. */
+export interface UpliftTotals {
+  principal: number;
+  current_value: number;
+  aave_baseline: number;
+  hold_baseline: number;
+  uplift_vs_aave: number;
+  uplift_vs_hold: number;
+  /** Uplift vs. the Aave-only baseline as a decimal fraction (`0.0006` == 0.06%). */
+  uplift_vs_aave_pct: number;
+}
+
+/** A single position's contribution to an uplift report. */
+export interface UpliftRow {
+  object: 'uplift_row';
+  position_id: string;
+  user_id: string | null;
+  asset: string;
+  vault_id: string;
+  principal: number;
+  current_value: number;
+  /** APY as a decimal fraction (`0.0642` == 6.42%). */
+  apy: number;
+  aave_baseline: number;
+  /** Baseline APY as a decimal fraction. */
+  baseline_apy: number;
+  hold_baseline: number;
+  uplift_vs_aave: number;
+  uplift_vs_hold: number;
+}
+
+/**
+ * A comparison of routed portfolio value against passive baselines (Aave-only
+ * and hold). All monetary fields are in the asset's native units;
+ * `uplift_vs_aave_pct` is a decimal fraction.
+ */
+export interface UpliftReport {
+  object: 'uplift';
+  /** ISO-8601 timestamp the report was computed at. */
+  as_of: string;
+  scope: string;
+  totals: UpliftTotals;
+  positions: UpliftRow[];
+}
+
+/** A vault considered alongside a routing decision. */
+export interface DecisionAlternative {
+  vault_id: string;
+  name: string;
+  provider: VaultProvider;
+  /** APY as a decimal fraction (`0.0642` == 6.42%). */
+  apy: number;
+  risk_tier: RiskTier;
+}
+
+/** A single routing/rebalance decision with its rationale. */
+export interface Decision {
+  object: 'decision';
+  id: string;
+  /** ISO-8601 timestamp of the decision. */
+  at: string;
+  position_id: string;
+  user_id: string | null;
+  asset: string;
+  type: DecisionType;
+  from_vault: string | null;
+  to_vault: string;
+  /** APY before the move as a decimal fraction (`null` for initial routing). */
+  apy_before: number | null;
+  /** APY after the move as a decimal fraction. */
+  apy_after: number;
+  /** Expected uplift in basis points (`null` when not applicable). */
+  expected_uplift_bps: number | null;
+  reason?: string;
+  alternatives: DecisionAlternative[];
+  rationale: string;
+  status: string;
+}
+
+/** A top opportunity surfaced by the advisor. */
+export interface AdvisorOpportunity {
+  vault_id: string;
+  name: string;
+  asset: string;
+  /** Risk-adjusted APY as a decimal fraction (`0.0642` == 6.42%). */
+  risk_adjusted_apy: number;
+  /** Forecast APY as a decimal fraction. */
+  forecast_apy: number;
+  recommendation: SignalRecommendation;
+}
+
+/** Portfolio summary embedded in the advisor report. */
+export interface AdvisorPortfolio {
+  current_value: number;
+  uplift_vs_aave: number;
+  /** Uplift vs. the Aave-only baseline as a decimal fraction. */
+  uplift_vs_aave_pct: number;
+  /** Number of positions in the portfolio. */
+  positions: number;
+}
+
+/** A human-readable advisory summarizing regime, opportunities, and portfolio. */
+export interface Advisor {
+  object: 'advisor';
+  /** ISO-8601 timestamp the advisory was computed at. */
+  as_of: string;
+  headline: string;
+  regime: MarketRegime;
+  bullets: string[];
+  top_opportunities: AdvisorOpportunity[];
+  portfolio: AdvisorPortfolio;
+  disclaimer: string;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Request parameter shapes                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -627,5 +806,30 @@ export interface ReconciliationReportParams {
 export interface ReconciliationSnapshotsParams {
   from?: string;
   to?: string;
+  asset?: string;
+}
+
+/** Query for `GET /analytics/uplift`. All filters are optional. */
+export interface AnalyticsUpliftParams {
+  user_id?: string;
+  asset?: string;
+}
+
+/** Query for `GET /analytics/decisions`. All filters are optional. */
+export interface AnalyticsDecisionsParams {
+  user_id?: string;
+  position_id?: string;
+  asset?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+/** Query for `GET /analytics/signals`. */
+export interface AnalyticsSignalsParams {
+  asset?: string;
+}
+
+/** Query for `GET /analytics/regime`. */
+export interface AnalyticsRegimeParams {
   asset?: string;
 }

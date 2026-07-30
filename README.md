@@ -15,12 +15,12 @@ developer.thesauros.io/
 │   ├── layout.jsx               Root layout (Onest + JetBrains Mono)
 │   ├── platform.module.css      Portal design system (dark console)
 │   ├── views/                   Overview, Quickstart, ApiReference (live Try-it),
-│   │                            ApiKeys, Users, Webhooks, Reconciliation,
-│   │                            Usage, Vaults, Status
+│   │                            ApiKeys, Users, Webhooks, Analytics & Advisor,
+│   │                            Reconciliation, Usage, Vaults, Status
 │   ├── ui/                      CodeBlock + syntax highlight, SVG charts, primitives
 │   ├── lib/                     Client-side API helper + formatters, icon set
 │   ├── data/                    Endpoint catalog + code samples (TS/Python/cURL)
-│   └── api/v1/                  REST API — 26 route handlers (see below)
+│   └── api/v1/                  REST API — 31 route handlers (see below)
 ├── lib/api/                     Server core: auth, rate limiting, simulation engine,
 │                                webhook signing/dispatch, SSRF guard, HTTP envelopes
 ├── sdk/
@@ -73,6 +73,7 @@ APY values are decimal fractions (`0.052` == 5.2%).
 | Rebalances | `GET /rebalances` |
 | Webhooks | `POST /webhooks`, `GET /webhooks`, `DELETE /webhooks/:id`, `POST /webhooks/:id/test`, `GET /webhooks/events` |
 | Reconciliation | `GET /reconciliation/ledger`, `GET /reconciliation/balances`, `GET /reconciliation/report`, `GET /reconciliation/snapshots` |
+| Analytics | `GET /analytics/uplift`, `GET /analytics/decisions`, `GET /analytics/signals`, `GET /analytics/regime`, `GET /analytics/advisor` |
 | Telemetry | `GET /usage`, `GET /status` (public), `GET /openapi.json` (public) |
 
 Cross-cutting behavior:
@@ -117,6 +118,28 @@ position = client.positions.create(wallet=addr, asset="USDC", amount=1000)
 
 Both SDKs include webhook signature verification and typed resource models. See
 `sdk/typescript/README.md` and `sdk/python/README.md`.
+
+## Analytics & AI foundation
+
+The `/analytics` endpoints implement the measurement + explainability foundation
+for the AI-over-PSO concept (`spec/AI_CONCEPT_STRATEGY.pdf`). This is the
+evidence-first slice, deliberately built before any ML models:
+
+- `uplift` — routed value vs passive baselines (Aave-only, hold-original). The
+  concept's primary proof point.
+- `decisions` — explainable log of every routing/rebalance decision with
+  alternatives considered, expected uplift and rationale.
+- `signals` — per-vault risk-adjusted APY (APY discounted by risk tier and
+  volatility) with a naive trend forecast and a recommendation.
+- `regime` — classifies the current rate regime (rising/falling/stable/volatile).
+- `advisor` — template-generated (non-LLM) strategy summary derived from the
+  metrics above.
+
+Everything here is deterministic and derived from live sandbox data. There are
+no ML models and no LLM — those require data and proof of uplift that do not
+exist yet. This layer is what a real AI allocator would need as its measurement
+and feature foundation anyway. See the critical assessment in the concept doc's
+companion notes.
 
 ## Architecture
 

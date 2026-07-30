@@ -17,6 +17,7 @@ import {
   IconExternal,
   IconUsers,
   IconScale,
+  IconSpark,
 } from './lib/icons';
 import Overview from './views/Overview';
 import Quickstart from './views/Quickstart';
@@ -28,6 +29,7 @@ import Vaults from './views/Vaults';
 import Status from './views/Status';
 import Users from './views/Users';
 import Reconciliation from './views/Reconciliation';
+import Analytics from './views/Analytics';
 
 const NAV_GROUPS = [
   {
@@ -47,6 +49,10 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: 'Intelligence',
+    items: [{ id: 'analytics', label: 'Analytics & Advisor', icon: IconSpark }],
+  },
+  {
     label: 'Operate',
     items: [
       { id: 'reconciliation', label: 'Reconciliation', icon: IconScale },
@@ -64,6 +70,7 @@ const VIEW_META = {
   keys: 'API Keys',
   users: 'Users',
   webhooks: 'Webhooks',
+  analytics: 'Analytics & Advisor',
   reconciliation: 'Reconciliation',
   usage: 'Usage',
   vaults: 'Vaults',
@@ -189,6 +196,7 @@ export default function PlatformPage() {
             {view === 'keys' ? <ApiKeys {...viewProps} /> : null}
             {view === 'users' ? <Users {...viewProps} /> : null}
             {view === 'webhooks' ? <Webhooks {...viewProps} /> : null}
+            {view === 'analytics' ? <Analytics {...viewProps} /> : null}
             {view === 'reconciliation' ? <Reconciliation {...viewProps} /> : null}
             {view === 'usage' ? <Usage {...viewProps} /> : null}
             {view === 'vaults' ? <Vaults {...viewProps} /> : null}

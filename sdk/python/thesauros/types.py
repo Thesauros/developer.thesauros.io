@@ -393,3 +393,167 @@ class BalanceSnapshot(TypedDict):
     positions: int  # number of positions at snapshot time
     users: int  # number of users at snapshot time
     by_asset: List[Dict[str, Any]]
+
+
+# ---------------------------------------------------------------------------
+# 4.11 Analytics
+# ---------------------------------------------------------------------------
+# SignalRecommendation = "overweight" | "neutral" | "underweight"
+# MarketRegime         = "rising" | "falling" | "stable" | "volatile"
+# DecisionType         = "initial_routing" | "rebalance"
+
+
+class Signal(TypedDict):
+    """A per-vault yield signal.
+
+    All ``*_apy`` fields, ``volatility``, and ``risk_factor`` are decimal
+    fractions (``0.0642`` == 6.42%); ``trend_slope_bps_day`` is a slope in basis
+    points per day.
+    """
+
+    object: str
+    vault_id: str
+    name: str
+    provider: str  # aave | morpho | compound | dolomite | treasury
+    asset: str  # USDC | USDT
+    chain: str  # base | arbitrum
+    risk_tier: str  # bluechip | core | opportunistic
+    apy: float  # decimal fraction (0.0642 == 6.42%)
+    volatility: float  # decimal fraction
+    trend_slope_bps_day: float  # basis points per day
+    forecast_apy: float  # decimal fraction
+    risk_factor: float  # multiplicative risk factor
+    risk_adjusted_apy: float  # decimal fraction
+    rank: int  # rank across all vaults (1 = best)
+    recommendation: str  # overweight | neutral | underweight
+
+
+class RegimeAsset(TypedDict):
+    """Per-asset contribution to a market regime report."""
+
+    asset: str
+    regime: str  # rising | falling | stable | volatile
+    blend_apy: float  # decimal fraction (0.0642 == 6.42%)
+    trend_slope_bps_day: float  # basis points per day
+    volatility: float  # decimal fraction
+
+
+class Regime(TypedDict):
+    """The current market regime and its per-asset breakdown."""
+
+    object: str
+    as_of: str  # ISO-8601 timestamp
+    regime: str  # rising | falling | stable | volatile
+    description: str
+    per_asset: List[RegimeAsset]
+
+
+class UpliftTotals(TypedDict):
+    """Aggregate totals for an uplift report."""
+
+    principal: float
+    current_value: float
+    aave_baseline: float
+    hold_baseline: float
+    uplift_vs_aave: float
+    uplift_vs_hold: float
+    uplift_vs_aave_pct: float  # decimal fraction (0.0006 == 0.06%)
+
+
+class UpliftRow(TypedDict):
+    """A single position's contribution to an uplift report."""
+
+    object: str
+    position_id: str
+    user_id: Optional[str]
+    asset: str
+    vault_id: str
+    principal: float
+    current_value: float
+    apy: float  # decimal fraction (0.0642 == 6.42%)
+    aave_baseline: float
+    baseline_apy: float  # decimal fraction
+    hold_baseline: float
+    uplift_vs_aave: float
+    uplift_vs_hold: float
+
+
+class UpliftReport(TypedDict):
+    """A comparison of routed portfolio value against passive baselines.
+
+    Compares against the Aave-only and hold baselines. All monetary fields are
+    in the asset's native units; ``uplift_vs_aave_pct`` is a decimal fraction.
+    """
+
+    object: str
+    as_of: str  # ISO-8601 timestamp
+    scope: str
+    totals: UpliftTotals
+    positions: List[UpliftRow]
+
+
+class DecisionAlternative(TypedDict):
+    """A vault considered alongside a routing decision."""
+
+    vault_id: str
+    name: str
+    provider: str
+    apy: float  # decimal fraction (0.0642 == 6.42%)
+    risk_tier: str
+
+
+class Decision(TypedDict):
+    """A single routing/rebalance decision with its rationale."""
+
+    object: str
+    id: str
+    at: str  # ISO-8601 timestamp
+    position_id: str
+    user_id: Optional[str]
+    asset: str
+    type: str  # initial_routing | rebalance
+    from_vault: Optional[str]
+    to_vault: str
+    apy_before: Optional[float]  # decimal fraction (null for initial routing)
+    apy_after: float  # decimal fraction
+    expected_uplift_bps: Optional[float]  # basis points (null when n/a)
+    reason: Optional[str]  # may be absent on the wire
+    alternatives: List[DecisionAlternative]
+    rationale: str
+    status: str
+
+
+class AdvisorOpportunity(TypedDict):
+    """A top opportunity surfaced by the advisor."""
+
+    vault_id: str
+    name: str
+    asset: str
+    risk_adjusted_apy: float  # decimal fraction (0.0642 == 6.42%)
+    forecast_apy: float  # decimal fraction
+    recommendation: str  # overweight | neutral | underweight
+
+
+class AdvisorPortfolio(TypedDict):
+    """Portfolio summary embedded in the advisor report."""
+
+    current_value: float
+    uplift_vs_aave: float
+    uplift_vs_aave_pct: float  # decimal fraction
+    positions: int  # number of positions in the portfolio
+
+
+class Advisor(TypedDict):
+    """A human-readable advisory.
+
+    Summarizes the regime, top opportunities, and portfolio.
+    """
+
+    object: str
+    as_of: str  # ISO-8601 timestamp
+    headline: str
+    regime: str  # rising | falling | stable | volatile
+    bullets: List[str]
+    top_opportunities: List[AdvisorOpportunity]
+    portfolio: AdvisorPortfolio
+    disclaimer: str

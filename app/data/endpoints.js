@@ -388,6 +388,65 @@ export const ENDPOINT_GROUPS = [
       },
     ],
   },
+  {
+    id: 'analytics',
+    label: 'Analytics',
+    blurb: 'Uplift, decision log, risk-adjusted signals, regime and advisor.',
+    endpoints: [
+      {
+        id: 'analytics-uplift',
+        method: 'GET',
+        path: '/analytics/uplift',
+        summary: 'Uplift vs baselines',
+        description: 'Routed portfolio value versus passive baselines (Aave-only and hold-original-vault). The primary proof point.',
+        params: [
+          { name: 'user_id', in: 'query', type: 'string', required: false, desc: 'Scope to a user', example: '' },
+          { name: 'asset', in: 'query', type: 'enum', required: false, options: ['USDC', 'USDT'], desc: 'Filter by asset', example: '' },
+        ],
+        returns: '200 \u2014 UpliftReport',
+      },
+      {
+        id: 'analytics-decisions',
+        method: 'GET',
+        path: '/analytics/decisions',
+        summary: 'Decision log',
+        description: 'Explainable log of routing and rebalance decisions with alternatives and expected uplift.',
+        params: [
+          { name: 'user_id', in: 'query', type: 'string', required: false, desc: 'Filter by user', example: '' },
+          { name: 'position_id', in: 'query', type: 'string', required: false, desc: 'Filter by position', example: '' },
+          { name: 'asset', in: 'query', type: 'enum', required: false, options: ['USDC', 'USDT'], desc: 'Filter by asset', example: '' },
+        ],
+        returns: '200 \u2014 list of Decision',
+      },
+      {
+        id: 'analytics-signals',
+        method: 'GET',
+        path: '/analytics/signals',
+        summary: 'Risk-adjusted signals',
+        description: 'Per-vault risk-adjusted APY with a naive trend forecast and a recommendation, ranked.',
+        params: [{ name: 'asset', in: 'query', type: 'enum', required: false, options: ['USDC', 'USDT'], desc: 'Filter by asset', example: '' }],
+        returns: '200 \u2014 list of Signal',
+      },
+      {
+        id: 'analytics-regime',
+        method: 'GET',
+        path: '/analytics/regime',
+        summary: 'Market regime',
+        description: 'Classifies the current rate regime (rising/falling/stable/volatile) from trend and volatility.',
+        params: [{ name: 'asset', in: 'query', type: 'enum', required: false, options: ['USDC', 'USDT'], desc: 'Restrict to one asset', example: '' }],
+        returns: '200 \u2014 Regime',
+      },
+      {
+        id: 'analytics-advisor',
+        method: 'GET',
+        path: '/analytics/advisor',
+        summary: 'Strategy advisor',
+        description: 'Template-generated (non-LLM) strategy summary: regime, top opportunities, portfolio uplift and rationale.',
+        params: [],
+        returns: '200 \u2014 Advisor',
+      },
+    ],
+  },
 ];
 
 export const WEBHOOK_EVENTS = [

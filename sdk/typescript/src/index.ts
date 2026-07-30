@@ -21,6 +21,7 @@ export {
   RebalancesResource,
   WebhooksResource,
   ReconciliationResource,
+  AnalyticsResource,
   UsageResource,
   StatusResource,
 } from './client.js';

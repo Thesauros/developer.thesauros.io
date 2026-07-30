@@ -221,6 +221,13 @@ export const IconScale = (p) => (
   </I>
 );
 
+export const IconSpark = (p) => (
+  <I {...p}>
+    <path d="M8 1.8 9.4 6.6 14.2 8 9.4 9.4 8 14.2 6.6 9.4 1.8 8 6.6 6.6 8 1.8Z" />
+    <path d="M12.5 1.8v2.4M11.3 3h2.4" opacity=".6" />
+  </I>
+);
+
 // Thesauros brand mark: abstract vault / routing glyph.
 export function BrandMark({ size = 18 }) {
   return (
