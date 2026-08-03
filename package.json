@@ -5,17 +5,41 @@
   "description": "Thesauros Developer Platform — developer portal, sandbox REST API and SDKs for institutional yield integration.",
   "scripts": {
     "dev": "next dev",
+    "dev:api": "npx nest start --watch --tsc -p tsconfig.server.json",
     "build": "next build",
+    "build:api": "npx nest build -p tsconfig.server.json",
     "start": "next start",
+    "start:api": "node dist/main.js",
+    "test": "jest --config jest.config.js --forceExit",
+    "test:watch": "jest --config jest.config.js --watch",
     "format": "prettier . --write",
     "format:check": "prettier . --check"
   },
   "dependencies": {
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11.1.28",
+    "@nestjs/platform-express": "^11.1.28",
+    "@nestjs/swagger": "^11.4.6",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
     "next": "^16.2.7",
     "react": "19.2.5",
-    "react-dom": "19.2.5"
+    "react-dom": "19.2.5",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
-    "prettier": "^3.8.3"
+    "@nestjs/cli": "^11.0.24",
+    "@nestjs/testing": "^11.1.28",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.1.2",
+    "jest": "^30.4.2",
+    "prettier": "^3.8.3",
+    "ts-jest": "^29.4.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }
