@@ -66,7 +66,7 @@ export class AuthService {
     for (let i = 0; i < 32; i++) body += BASE62[randomInt(BASE62.length)];
     const plainSecret = prefix + body;
     const defaultScopes = opts.partner_id
-      ? ['read', 'partner:read']
+      ? ['partner:read']
       : ['read', 'write', 'keys:admin'];
     const key: ApiKey = {
       id: `key_${randomBytes(8).toString('hex')}`,
