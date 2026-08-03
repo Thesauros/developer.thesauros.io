@@ -478,6 +478,49 @@ function buildDoc() {
           responses: withErrors({ 200: single('Advisor', 'Advisor summary') }, [401, 429, 500]),
         },
       },
+      '/analytics/pso': {
+        get: {
+          tags: ['analytics'],
+          summary: 'PSO allocation',
+          description:
+            'Current Particle Swarm Optimization allocation for an asset: per-vault weights maximizing risk-adjusted return under a diversification cap.',
+          parameters: [q('asset', 'Restrict to one asset', { enum: ['USDC', 'USDT'] })],
+          responses: withErrors({ 200: single('PsoAllocation', 'Optimized allocation') }, [401, 429, 500]),
+        },
+      },
+      '/analytics/backtest': {
+        get: {
+          tags: ['analytics'],
+          summary: 'Run a backtest',
+          description:
+            'Replay the historical rate series through one allocation strategy. Returns the equity curve, APY, volatility, drawdown and rebalance count.',
+          parameters: [
+            q('strategy', 'Allocation strategy', { enum: ['aave-only', 'best-apy', 'risk-adjusted-pso'] }),
+            q('asset', 'Restrict to one asset', { enum: ['USDC', 'USDT'] }),
+            q('from', 'Start (epoch ms or YYYY-MM-DD). Default: 90 days ago'),
+            q('to', 'End (epoch ms or YYYY-MM-DD). Default: now'),
+            q('principal', 'Starting principal (default 10000)'),
+            q('rebalance_every', 'Rebalance cadence in days (default 7)'),
+          ],
+          responses: withErrors({ 200: single('Backtest', 'Backtest result') }, [400, 401, 429, 500]),
+        },
+      },
+      '/analytics/backtests/compare': {
+        get: {
+          tags: ['analytics'],
+          summary: 'Compare strategies',
+          description:
+            'Run all strategies over the same range and compare final value, APY, volatility, drawdown and uplift vs the aave-only baseline.',
+          parameters: [
+            q('asset', 'Restrict to one asset', { enum: ['USDC', 'USDT'] }),
+            q('from', 'Start (epoch ms or YYYY-MM-DD). Default: 90 days ago'),
+            q('to', 'End (epoch ms or YYYY-MM-DD). Default: now'),
+            q('principal', 'Starting principal (default 10000)'),
+            q('rebalance_every', 'Rebalance cadence in days (default 7)'),
+          ],
+          responses: withErrors({ 200: single('BacktestComparison', 'Strategy comparison') }, [400, 401, 429, 500]),
+        },
+      },
       '/usage': {
         get: {
           tags: ['telemetry'],
@@ -1041,6 +1084,90 @@ function buildDoc() {
               },
             },
             disclaimer: { type: 'string' },
+          },
+        },
+        PsoAllocationItem: {
+          type: 'object',
+          properties: {
+            vault_id: { type: 'string' },
+            name: { type: 'string' },
+            asset: { type: 'string' },
+            risk_tier: { type: 'string' },
+            weight: { type: 'number', description: 'Allocation weight (0-1)' },
+            risk_adjusted_apy: { type: 'number', description: 'Decimal fraction' },
+          },
+        },
+        PsoAllocation: {
+          type: 'object',
+          properties: {
+            object: { type: 'string', enum: ['pso_allocation'] },
+            asset: { type: 'string' },
+            expected_return: { type: 'number', description: 'Risk-adjusted expected return, decimal fraction' },
+            iterations: { type: 'integer' },
+            particles: { type: 'integer' },
+            converged: { type: 'boolean' },
+            allocations: { type: 'array', items: ref('PsoAllocationItem') },
+          },
+        },
+        BacktestPoint: {
+          type: 'object',
+          properties: {
+            t: { type: 'integer', description: 'Epoch ms' },
+            value: { type: 'number' },
+          },
+        },
+        Backtest: {
+          type: 'object',
+          properties: {
+            object: { type: 'string', enum: ['backtest'] },
+            strategy: { type: 'string', enum: ['aave-only', 'best-apy', 'risk-adjusted-pso'] },
+            asset: { type: 'string' },
+            from: { type: 'string', format: 'date-time' },
+            to: { type: 'string', format: 'date-time' },
+            days: { type: 'integer' },
+            principal: { type: 'number' },
+            final_value: { type: 'number' },
+            total_return_pct: { type: 'number' },
+            apy: { type: 'number', description: 'Decimal fraction' },
+            volatility_pct: { type: 'number', description: 'Annualized volatility of daily returns' },
+            max_drawdown_pct: { type: 'number' },
+            rebalances: { type: 'integer' },
+            series: { type: 'array', items: ref('BacktestPoint') },
+          },
+        },
+        BacktestStrategyRow: {
+          type: 'object',
+          properties: {
+            strategy: { type: 'string' },
+            final_value: { type: 'number' },
+            total_return_pct: { type: 'number' },
+            apy: { type: 'number' },
+            volatility_pct: { type: 'number' },
+            max_drawdown_pct: { type: 'number' },
+            rebalances: { type: 'integer' },
+            uplift_vs_baseline: { type: 'number' },
+          },
+        },
+        BacktestComparison: {
+          type: 'object',
+          properties: {
+            object: { type: 'string', enum: ['backtest_comparison'] },
+            asset: { type: 'string' },
+            from: { type: 'string', format: 'date-time' },
+            to: { type: 'string', format: 'date-time' },
+            principal: { type: 'number' },
+            baseline: { type: 'string' },
+            strategies: { type: 'array', items: ref('BacktestStrategyRow') },
+            series: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  strategy: { type: 'string' },
+                  points: { type: 'array', items: ref('BacktestPoint') },
+                },
+              },
+            },
           },
         },
       },

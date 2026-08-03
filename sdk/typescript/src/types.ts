@@ -833,3 +833,126 @@ export interface AnalyticsSignalsParams {
 export interface AnalyticsRegimeParams {
   asset?: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Backtesting / PSO                                                           */
+/* -------------------------------------------------------------------------- */
+
+/** Allocation strategies available to the backtester. */
+export type BacktestStrategy = 'aave-only' | 'best-apy' | 'risk-adjusted-pso';
+
+/** Query for `GET /analytics/pso`. */
+export interface AnalyticsPsoParams {
+  asset?: string;
+}
+
+/** Query for `GET /analytics/backtest`. */
+export interface AnalyticsBacktestParams {
+  strategy?: BacktestStrategy;
+  asset?: string;
+  /** Epoch ms or YYYY-MM-DD. Server defaults to 90 days ago. */
+  from?: number | string;
+  /** Epoch ms or YYYY-MM-DD. Server defaults to now. */
+  to?: number | string;
+  principal?: number;
+  rebalance_every?: number;
+}
+
+/** Query for `GET /analytics/backtests/compare`. */
+export interface AnalyticsBacktestsCompareParams {
+  asset?: string;
+  /** Epoch ms or YYYY-MM-DD. Server defaults to 90 days ago. */
+  from?: number | string;
+  /** Epoch ms or YYYY-MM-DD. Server defaults to now. */
+  to?: number | string;
+  principal?: number;
+  rebalance_every?: number;
+}
+
+/** A vault's allocation weight in a PSO result. */
+export interface PsoAllocationItem {
+  vault_id: string;
+  name: string;
+  asset: string;
+  risk_tier: string;
+  /** Allocation weight, 0-1. */
+  weight: number;
+  /** Risk-adjusted APY, decimal fraction (0.0642 == 6.42%). */
+  risk_adjusted_apy: number;
+}
+
+/** Response of `GET /analytics/pso`. */
+export interface PsoAllocation {
+  object: 'pso_allocation';
+  asset: string;
+  /** Risk-adjusted expected return, decimal fraction. */
+  expected_return: number;
+  iterations: number;
+  particles: number;
+  converged: boolean;
+  allocations: PsoAllocationItem[];
+}
+
+/** A point on a backtest equity curve. */
+export interface BacktestPoint {
+  /** Unix epoch timestamp in milliseconds. */
+  t: number;
+  value: number;
+}
+
+/** Response of `GET /analytics/backtest`. */
+export interface Backtest {
+  object: 'backtest';
+  strategy: BacktestStrategy;
+  asset: string;
+  /** ISO-8601 timestamp. */
+  from: string;
+  /** ISO-8601 timestamp. */
+  to: string;
+  days: number;
+  principal: number;
+  final_value: number;
+  /** Percentage points. */
+  total_return_pct: number;
+  /** Decimal fraction (0.0642 == 6.42%). */
+  apy: number;
+  /** Annualized volatility of daily returns, percentage points. */
+  volatility_pct: number;
+  /** Percentage points. */
+  max_drawdown_pct: number;
+  rebalances: number;
+  series: BacktestPoint[];
+}
+
+/** One strategy's summary row in a comparison. */
+export interface BacktestStrategyRow {
+  strategy: BacktestStrategy;
+  final_value: number;
+  total_return_pct: number;
+  apy: number;
+  volatility_pct: number;
+  max_drawdown_pct: number;
+  rebalances: number;
+  /** Monetary uplift vs the aave-only baseline. */
+  uplift_vs_baseline: number;
+}
+
+/** A strategy's equity curve in a comparison. */
+export interface BacktestComparisonSeries {
+  strategy: BacktestStrategy;
+  points: BacktestPoint[];
+}
+
+/** Response of `GET /analytics/backtests/compare`. */
+export interface BacktestComparison {
+  object: 'backtest_comparison';
+  asset: string;
+  /** ISO-8601 timestamp. */
+  from: string;
+  /** ISO-8601 timestamp. */
+  to: string;
+  principal: number;
+  baseline: string;
+  strategies: BacktestStrategyRow[];
+  series: BacktestComparisonSeries[];
+}

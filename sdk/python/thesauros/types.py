@@ -557,3 +557,99 @@ class Advisor(TypedDict):
     top_opportunities: List[AdvisorOpportunity]
     portfolio: AdvisorPortfolio
     disclaimer: str
+
+
+# --------------------------------------------------------------------------- #
+# Backtesting / PSO
+# --------------------------------------------------------------------------- #
+
+# BacktestStrategy = "aave-only" | "best-apy" | "risk-adjusted-pso"
+
+
+class PsoAllocationItem(TypedDict):
+    """A vault's allocation weight in a PSO result."""
+
+    vault_id: str
+    name: str
+    asset: str
+    risk_tier: str
+    weight: float  # 0-1
+    risk_adjusted_apy: float  # decimal fraction (0.0642 == 6.42%)
+
+
+class PsoAllocation(TypedDict):
+    """Response of ``GET /analytics/pso``."""
+
+    object: str
+    asset: str
+    expected_return: float  # risk-adjusted, decimal fraction
+    iterations: int
+    particles: int
+    converged: bool
+    allocations: List[PsoAllocationItem]
+
+
+class BacktestPoint(TypedDict):
+    """A point on a backtest equity curve."""
+
+    t: int  # epoch ms
+    value: float
+
+
+# `Backtest` and `BacktestComparison` carry a literal `from` key, which is a
+# Python keyword and illegal in class-syntax TypedDicts, so they use the
+# functional syntax to stay wire-identical.
+Backtest = TypedDict(
+    "Backtest",
+    {
+        "object": str,
+        "strategy": str,  # aave-only | best-apy | risk-adjusted-pso
+        "asset": str,
+        "from": str,  # ISO-8601 timestamp
+        "to": str,  # ISO-8601 timestamp
+        "days": int,
+        "principal": float,
+        "final_value": float,
+        "total_return_pct": float,  # percentage points
+        "apy": float,  # decimal fraction
+        "volatility_pct": float,  # annualized, percentage points
+        "max_drawdown_pct": float,  # percentage points
+        "rebalances": int,
+        "series": List[BacktestPoint],
+    },
+)
+
+
+class BacktestStrategyRow(TypedDict):
+    """One strategy's summary row in a comparison."""
+
+    strategy: str
+    final_value: float
+    total_return_pct: float
+    apy: float
+    volatility_pct: float
+    max_drawdown_pct: float
+    rebalances: int
+    uplift_vs_baseline: float  # monetary, vs the aave-only baseline
+
+
+class BacktestComparisonSeries(TypedDict):
+    """A strategy's equity curve in a comparison."""
+
+    strategy: str
+    points: List[BacktestPoint]
+
+
+BacktestComparison = TypedDict(
+    "BacktestComparison",
+    {
+        "object": str,
+        "asset": str,
+        "from": str,  # ISO-8601 timestamp
+        "to": str,  # ISO-8601 timestamp
+        "principal": float,
+        "baseline": str,
+        "strategies": List[BacktestStrategyRow],
+        "series": List[BacktestComparisonSeries],
+    },
+)

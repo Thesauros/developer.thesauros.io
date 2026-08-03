@@ -10,11 +10,16 @@
 import { HttpClient, type ClientConfig, type LastResponse } from './http.js';
 import type {
   Advisor,
+  AnalyticsBacktestParams,
+  AnalyticsBacktestsCompareParams,
   AnalyticsDecisionsParams,
+  AnalyticsPsoParams,
   AnalyticsRegimeParams,
   AnalyticsSignalsParams,
   AnalyticsUpliftParams,
   ApiKey,
+  Backtest,
+  BacktestComparison,
   Balance,
   BalanceSnapshot,
   CreateOptions,
@@ -28,6 +33,7 @@ import type {
   PositionEvent,
   PositionListParams,
   PositionWithdrawParams,
+  PsoAllocation,
   Rebalance,
   RebalanceListParams,
   Reconciliation,
@@ -388,6 +394,36 @@ export class AnalyticsResource {
   /** Fetch the human-readable advisory (headline, regime, opportunities, portfolio). */
   advisor(): Promise<Advisor> {
     return this.http.request<Advisor>({ method: 'GET', path: 'analytics/advisor' });
+  }
+
+  /** Fetch the current PSO allocation for an asset (per-vault weights). */
+  pso(params: AnalyticsPsoParams = {}): Promise<PsoAllocation> {
+    return this.http.request<PsoAllocation>({
+      method: 'GET',
+      path: 'analytics/pso',
+      query: { ...params },
+    });
+  }
+
+  /**
+   * Run a single backtest of a strategy over a range. `from`/`to` accept epoch
+   * ms or a YYYY-MM-DD string. Defaults server-side to the last 90 days.
+   */
+  backtest(params: AnalyticsBacktestParams): Promise<Backtest> {
+    return this.http.request<Backtest>({
+      method: 'GET',
+      path: 'analytics/backtest',
+      query: { ...params },
+    });
+  }
+
+  /** Run all strategies over the same range and compare them vs the baseline. */
+  compareBacktests(params: AnalyticsBacktestsCompareParams = {}): Promise<BacktestComparison> {
+    return this.http.request<BacktestComparison>({
+      method: 'GET',
+      path: 'analytics/backtests/compare',
+      query: { ...params },
+    });
   }
 }
 

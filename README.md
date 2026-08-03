@@ -16,11 +16,11 @@ developer.thesauros.io/
 │   ├── platform.module.css      Portal design system (dark console)
 │   ├── views/                   Overview, Quickstart, ApiReference (live Try-it),
 │   │                            ApiKeys, Users, Webhooks, Analytics & Advisor,
-│   │                            Reconciliation, Usage, Vaults, Status
+│   │                            Backtests & PSO, Reconciliation, Usage, Vaults, Status
 │   ├── ui/                      CodeBlock + syntax highlight, SVG charts, primitives
 │   ├── lib/                     Client-side API helper + formatters, icon set
 │   ├── data/                    Endpoint catalog + code samples (TS/Python/cURL)
-│   └── api/v1/                  REST API — 31 route handlers (see below)
+│   └── api/v1/                  REST API — 34 route handlers (see below)
 ├── lib/api/                     Server core: auth, rate limiting, simulation engine,
 │                                webhook signing/dispatch, SSRF guard, HTTP envelopes
 ├── sdk/
@@ -73,7 +73,7 @@ APY values are decimal fractions (`0.052` == 5.2%).
 | Rebalances | `GET /rebalances` |
 | Webhooks | `POST /webhooks`, `GET /webhooks`, `DELETE /webhooks/:id`, `POST /webhooks/:id/test`, `GET /webhooks/events` |
 | Reconciliation | `GET /reconciliation/ledger`, `GET /reconciliation/balances`, `GET /reconciliation/report`, `GET /reconciliation/snapshots` |
-| Analytics | `GET /analytics/uplift`, `GET /analytics/decisions`, `GET /analytics/signals`, `GET /analytics/regime`, `GET /analytics/advisor` |
+| Analytics | `GET /analytics/uplift`, `GET /analytics/decisions`, `GET /analytics/signals`, `GET /analytics/regime`, `GET /analytics/advisor`, `GET /analytics/pso`, `GET /analytics/backtest`, `GET /analytics/backtests/compare` |
 | Telemetry | `GET /usage`, `GET /status` (public), `GET /openapi.json` (public) |
 
 Cross-cutting behavior:
@@ -134,12 +134,24 @@ evidence-first slice, deliberately built before any ML models:
 - `regime` — classifies the current rate regime (rising/falling/stable/volatile).
 - `advisor` — template-generated (non-LLM) strategy summary derived from the
   metrics above.
+- `pso` — current Particle Swarm Optimization allocation: per-vault weights
+  maximizing risk-adjusted return under a diversification cap.
+- `backtest` / `backtests/compare` — replay the historical rate series through
+  competing strategies (aave-only / best-apy / risk-adjusted-pso) and compare
+  final value, APY, volatility, drawdown and uplift vs the baseline.
 
 Everything here is deterministic and derived from live sandbox data. There are
 no ML models and no LLM — those require data and proof of uplift that do not
 exist yet. This layer is what a real AI allocator would need as its measurement
-and feature foundation anyway. See the critical assessment in the concept doc's
-companion notes.
+and feature foundation anyway.
+
+**Data seam.** Historical rates come from `lib/api/marketdata.js`, currently a
+deterministic simulation. It exposes a stable contract
+(`getHistoricalSeries({ asset, from, to }) -> [{ t, rates }]`). To connect real
+data, an engineer replaces that module's internals with an indexer / subgraph /
+on-chain source — the PSO, backtester, routes, portal and SDK all stay
+unchanged. That isolation is deliberate. See the critical assessment in the
+concept doc's companion notes.
 
 ## Architecture
 

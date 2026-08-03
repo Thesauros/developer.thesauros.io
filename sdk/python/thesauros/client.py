@@ -6,13 +6,15 @@ envelope ``meta``, the request id, and rate-limit headers from the most recent
 call are available on ``client.last_response`` (and ``client.last_meta``).
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote
 
 from ._http import HttpClient
 from .types import (
     Advisor,
     ApiKey,
+    Backtest,
+    BacktestComparison,
     Balance,
     BalanceSnapshot,
     Decision,
@@ -21,6 +23,7 @@ from .types import (
     LedgerEntry,
     Position,
     PositionEvent,
+    PsoAllocation,
     Rebalance,
     Reconciliation,
     Regime,
@@ -462,6 +465,58 @@ class AnalyticsResource:
     def advisor(self) -> Advisor:
         """Fetch the human-readable advisory (headline, regime, opportunities, portfolio)."""
         return self._http.request("GET", "analytics/advisor")
+
+    def pso(self, asset: Optional[str] = None) -> PsoAllocation:
+        """Fetch the current PSO allocation for an asset (per-vault weights)."""
+        return self._http.request("GET", "analytics/pso", query={"asset": asset})
+
+    def backtest(
+        self,
+        strategy: Optional[str] = None,
+        asset: Optional[str] = None,
+        from_: Optional[Union[int, str]] = None,
+        to: Optional[Union[int, str]] = None,
+        principal: Optional[float] = None,
+        rebalance_every: Optional[int] = None,
+    ) -> Backtest:
+        """Run a single backtest of a strategy over a range.
+
+        ``from_`` maps to the ``from`` query key (``from`` is a Python keyword).
+        Epoch ms or a YYYY-MM-DD string; the server defaults to the last 90 days.
+        """
+        return self._http.request(
+            "GET",
+            "analytics/backtest",
+            query={
+                "strategy": strategy,
+                "asset": asset,
+                "from": from_,
+                "to": to,
+                "principal": principal,
+                "rebalance_every": rebalance_every,
+            },
+        )
+
+    def compare_backtests(
+        self,
+        asset: Optional[str] = None,
+        from_: Optional[Union[int, str]] = None,
+        to: Optional[Union[int, str]] = None,
+        principal: Optional[float] = None,
+        rebalance_every: Optional[int] = None,
+    ) -> BacktestComparison:
+        """Run all strategies over the same range and compare them vs the baseline."""
+        return self._http.request(
+            "GET",
+            "analytics/backtests/compare",
+            query={
+                "asset": asset,
+                "from": from_,
+                "to": to,
+                "principal": principal,
+                "rebalance_every": rebalance_every,
+            },
+        )
 
 
 class Thesauros:

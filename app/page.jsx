@@ -30,6 +30,7 @@ import Status from './views/Status';
 import Users from './views/Users';
 import Reconciliation from './views/Reconciliation';
 import Analytics from './views/Analytics';
+import Backtests from './views/Backtests';
 
 const NAV_GROUPS = [
   {
@@ -50,7 +51,10 @@ const NAV_GROUPS = [
   },
   {
     label: 'Intelligence',
-    items: [{ id: 'analytics', label: 'Analytics & Advisor', icon: IconSpark }],
+    items: [
+      { id: 'analytics', label: 'Analytics & Advisor', icon: IconSpark },
+      { id: 'backtests', label: 'Backtests & PSO', icon: IconChart },
+    ],
   },
   {
     label: 'Operate',
@@ -71,6 +75,7 @@ const VIEW_META = {
   users: 'Users',
   webhooks: 'Webhooks',
   analytics: 'Analytics & Advisor',
+  backtests: 'Backtests & PSO',
   reconciliation: 'Reconciliation',
   usage: 'Usage',
   vaults: 'Vaults',
@@ -197,6 +202,7 @@ export default function PlatformPage() {
             {view === 'users' ? <Users {...viewProps} /> : null}
             {view === 'webhooks' ? <Webhooks {...viewProps} /> : null}
             {view === 'analytics' ? <Analytics {...viewProps} /> : null}
+            {view === 'backtests' ? <Backtests {...viewProps} /> : null}
             {view === 'reconciliation' ? <Reconciliation {...viewProps} /> : null}
             {view === 'usage' ? <Usage {...viewProps} /> : null}
             {view === 'vaults' ? <Vaults {...viewProps} /> : null}
