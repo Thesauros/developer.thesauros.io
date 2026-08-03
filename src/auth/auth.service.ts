@@ -21,6 +21,14 @@ interface ApiKey {
 
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
+const ASSIGNABLE_SCOPES = new Set(['read', 'write', 'partner:read', 'partner:admin']);
+const PRIVILEGED_SCOPES = new Set(['*', 'keys:admin']);
+
+const PUBLIC_KEY_FIELDS = [
+  'id', 'object', 'label', 'prefix', 'environment',
+  'created_at', 'last_used_at', 'revoked', 'scopes', 'partner_id',
+] as const;
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -35,10 +43,7 @@ export class AuthService {
       return { error: 'Malformed API key. Keys start with tsk_test_ or tsk_live_.' };
     }
     const hash = this.crypto.hashSecret(secret);
-    let key = this.store.filter<ApiKey>('keys', (k) => k.secret_hash === hash)[0];
-    if (!key) {
-      key = this.store.filter<ApiKey>('keys', (k) => this.crypto.decrypt(k.secret) === secret)[0];
-    }
+    const key = this.store.filter<ApiKey>('keys', (k) => k.secret_hash === hash)[0];
     if (!key) {
       return { error: 'Invalid API key.' };
     }
@@ -60,14 +65,16 @@ export class AuthService {
     scopes?: string[];
     partner_id?: string;
   }): ApiKey & { _plaintext_secret: string } {
-    const environment = opts.environment === 'live' ? 'live' : 'test';
-    const prefix = environment === 'live' ? 'tsk_live_' : 'tsk_test_';
+    const environment = 'test';
+    const prefix = 'tsk_test_';
+    const sanitizedScopes = (opts.scopes ?? []).filter((s) => ASSIGNABLE_SCOPES.has(s));
+    const defaultScopes = opts.partner_id
+      ? ['partner:read']
+      : ['read', 'write'];
+    const finalScopes = sanitizedScopes.length > 0 ? sanitizedScopes : defaultScopes;
     let body = '';
     for (let i = 0; i < 32; i++) body += BASE62[randomInt(BASE62.length)];
     const plainSecret = prefix + body;
-    const defaultScopes = opts.partner_id
-      ? ['partner:read']
-      : ['read', 'write', 'keys:admin'];
     const key: ApiKey = {
       id: `key_${randomBytes(8).toString('hex')}`,
       object: 'api_key',
@@ -79,7 +86,7 @@ export class AuthService {
       created_at: new Date().toISOString(),
       last_used_at: null,
       revoked: false,
-      scopes: opts.scopes?.length ? opts.scopes : defaultScopes,
+      scopes: finalScopes,
       partner_id: opts.partner_id ?? null,
     };
     this.store.create('keys', key);
@@ -92,8 +99,13 @@ export class AuthService {
     return `${pfx}...${plain.slice(-4)}`;
   }
 
-  publicKey(key: ApiKey): Omit<ApiKey, 'secret'> & { secret: string } {
-    return { ...key, secret: this.maskSecret(key.secret) };
+  publicKey(key: ApiKey): Record<string, unknown> & { secret: string } {
+    const safe: Record<string, unknown> = {};
+    for (const field of PUBLIC_KEY_FIELDS) {
+      safe[field] = key[field];
+    }
+    safe['secret'] = this.maskSecret(key.secret);
+    return safe as Record<string, unknown> & { secret: string };
   }
 
   listKeys(): ApiKey[] {

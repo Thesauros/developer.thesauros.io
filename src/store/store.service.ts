@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 
 interface StoreRecord {
   id: string;
@@ -196,11 +197,18 @@ export class StoreService implements OnModuleInit {
     ];
   }
 
+  private sha256(value: string): string {
+    return createHash('sha256').update(value).digest('hex');
+  }
+
   private seedKeys(): StoreRecord[] {
+    const bootstrapSecret = 'tsk_test_thesauros_sandbox_0000000000000000';
+    const acmeSecret = 'tsk_test_acme_partner_key_00000000000000000';
+    const orbitSecret = 'tsk_test_orbit_partner_key_0000000000000000';
     return [
-      { id: 'key_bootstrap', object: 'api_key', label: 'Sandbox bootstrap key', secret: 'tsk_test_thesauros_sandbox_0000000000000000', secret_hash: null, prefix: 'tsk_test_the', environment: 'test', created_at: daysAgo(90), last_used_at: null, revoked: false, scopes: ['*'], partner_id: null },
-      { id: 'key_seed_acme', object: 'api_key', label: 'Acme Wallet partner key', secret: 'tsk_test_acme_partner_key_00000000000000000', secret_hash: null, prefix: 'tsk_test_acm', environment: 'test', created_at: daysAgo(58), last_used_at: null, revoked: false, scopes: ['partner:read', 'partner:admin'], partner_id: 'ptn_seed_acme' },
-      { id: 'key_seed_orbit', object: 'api_key', label: 'Orbit Finance partner key', secret: 'tsk_test_orbit_partner_key_0000000000000000', secret_hash: null, prefix: 'tsk_test_orb', environment: 'test', created_at: daysAgo(43), last_used_at: null, revoked: false, scopes: ['partner:read', 'partner:admin'], partner_id: 'ptn_seed_orbit' },
+      { id: 'key_bootstrap', object: 'api_key', label: 'Sandbox bootstrap key', secret: bootstrapSecret, secret_hash: this.sha256(bootstrapSecret), prefix: 'tsk_test_the', environment: 'test', created_at: daysAgo(90), last_used_at: null, revoked: false, scopes: ['read', 'write'], partner_id: null },
+      { id: 'key_seed_acme', object: 'api_key', label: 'Acme Wallet partner key', secret: acmeSecret, secret_hash: this.sha256(acmeSecret), prefix: 'tsk_test_acm', environment: 'test', created_at: daysAgo(58), last_used_at: null, revoked: false, scopes: ['partner:read'], partner_id: 'ptn_seed_acme' },
+      { id: 'key_seed_orbit', object: 'api_key', label: 'Orbit Finance partner key', secret: orbitSecret, secret_hash: this.sha256(orbitSecret), prefix: 'tsk_test_orb', environment: 'test', created_at: daysAgo(43), last_used_at: null, revoked: false, scopes: ['partner:read'], partner_id: 'ptn_seed_orbit' },
     ];
   }
 

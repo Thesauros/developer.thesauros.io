@@ -66,9 +66,12 @@ describe('AuthService', () => {
   });
 
   describe('hasScope', () => {
-    it('wildcard grants any scope', () => {
+    it('bootstrap key has read+write but not admin scopes', () => {
       const key = store.get<any>('keys', 'key_bootstrap');
-      expect(service.hasScope(key!, 'anything')).toBe(true);
+      expect(service.hasScope(key!, 'read')).toBe(true);
+      expect(service.hasScope(key!, 'write')).toBe(true);
+      expect(service.hasScope(key!, 'keys:admin')).toBe(false);
+      expect(service.hasScope(key!, 'partner:admin')).toBe(false);
     });
 
     it('specific scope must match', () => {
@@ -76,9 +79,22 @@ describe('AuthService', () => {
       expect(service.hasScope(key!, 'partner:read')).toBe(true);
       expect(service.hasScope(key!, 'keys:admin')).toBe(false);
     });
+
+    it('generated key cannot escalate to keys:admin', () => {
+      const key = service.generateKey({ label: 'Escalation test', scopes: ['read', 'keys:admin', '*'] });
+      expect(key.scopes).toContain('read');
+      expect(key.scopes).not.toContain('keys:admin');
+      expect(key.scopes).not.toContain('*');
+    });
+
+    it('generated key is always test environment', () => {
+      const key = service.generateKey({ label: 'Env test', environment: 'live' });
+      expect(key.environment).toBe('test');
+      expect(key._plaintext_secret).toMatch(/^tsk_test_/);
+    });
   });
 
-  describe('maskSecret', () => {
+  describe('maskSecret + publicKey', () => {
     it('masks plaintext secrets', () => {
       expect(service.maskSecret('tsk_test_abcdef1234')).toBe('tsk_test_...1234');
     });
@@ -87,6 +103,14 @@ describe('AuthService', () => {
       const encrypted = crypto.encrypt('tsk_live_abcdef5678');
       const masked = service.maskSecret(encrypted);
       expect(masked).toBe('tsk_live_...5678');
+    });
+
+    it('publicKey strips secret_hash and raw secret', () => {
+      const key = service.generateKey({ label: 'PK test' });
+      const pub = service.publicKey(key);
+      expect(pub.secret).toMatch(/^tsk_test_\.\.\..{4}$/);
+      expect(pub).not.toHaveProperty('secret_hash');
+      expect(pub).not.toHaveProperty('_plaintext_secret');
     });
   });
 

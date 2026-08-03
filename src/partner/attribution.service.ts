@@ -101,22 +101,10 @@ export class AttributionService {
    * ---------------------------------------------------------------- */
 
   private getPartnerPositions(partnerId: string): Position[] {
-    const attributions = this.listAttributions(partnerId);
-    const userIds = new Set(attributions.map((a) => a.user_id));
-    const byPartnerId = this.store.filter<Position>('positions', (p) => p.partner_id === partnerId);
-    const byUser = this.store.filter<Position>(
+    return this.store.filter<Position>(
       'positions',
-      (p) => p.user_id != null && userIds.has(p.user_id) && p.partner_id !== partnerId,
+      (p) => p.partner_id === partnerId,
     );
-    const seen = new Set<string>();
-    const result: Position[] = [];
-    for (const p of [...byPartnerId, ...byUser]) {
-      if (!seen.has(p.id)) {
-        seen.add(p.id);
-        result.push(p);
-      }
-    }
-    return result;
   }
 
   /* ---------------------------------------------------------------- *

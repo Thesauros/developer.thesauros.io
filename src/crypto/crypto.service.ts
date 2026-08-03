@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   createCipheriv,
   createDecipheriv,
@@ -13,18 +13,27 @@ const ENCRYPTED_PREFIX = 'enc:';
 
 @Injectable()
 export class CryptoService {
+  private readonly logger = new Logger(CryptoService.name);
   private readonly key: Buffer;
 
   constructor() {
     const raw = process.env.ENCRYPTION_KEY;
+    const nodeEnv = process.env.NODE_ENV ?? 'development';
     if (raw && /^[0-9a-f]{64}$/i.test(raw)) {
       this.key = Buffer.from(raw, 'hex');
     } else if (raw) {
       this.key = createHash('sha256').update(raw).digest();
+    } else if (nodeEnv === 'production') {
+      throw new Error(
+        'ENCRYPTION_KEY is required in production. ' +
+        'Set a 64-char hex string (32 bytes) or any passphrase.',
+      );
     } else {
-      this.key = createHash('sha256')
-        .update('thesauros-dev-encryption-key-do-not-use-in-prod')
-        .digest();
+      this.key = randomBytes(32);
+      this.logger.warn(
+        'ENCRYPTION_KEY not set — using ephemeral random key. ' +
+        'Encrypted data will NOT survive restarts. Set ENCRYPTION_KEY for persistence.',
+      );
     }
   }
 
