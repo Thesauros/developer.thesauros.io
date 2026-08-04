@@ -7,7 +7,7 @@
     "dev": "next dev",
     "dev:api": "npx nest start --watch --tsc -p tsconfig.server.json",
     "build": "next build",
-    "build:api": "npx nest build -p tsconfig.server.json",
+    "build:api": "rm -rf dist tsconfig.server.tsbuildinfo && npx tsc -p tsconfig.server.json",
     "start": "next start",
     "start:api": "node dist/main.js",
     "db:up": "docker compose up -d postgres",
