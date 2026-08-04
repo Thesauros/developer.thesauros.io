@@ -32,11 +32,11 @@ export class RevenueService {
     private readonly attribution: AttributionService,
   ) {}
 
-  calculateRevenueShare(partnerId: string): RevenueShareResult | null {
-    const partner = this.store.get<any>('partners', partnerId);
+  async calculateRevenueShare(partnerId: string): Promise<RevenueShareResult | null> {
+    const partner = await this.store.get<any>('partners', partnerId);
     if (!partner) return null;
-    const tvlData = this.attribution.getNetTVL(partnerId);
-    const blendApy = this.computeBlendApy();
+    const tvlData = await this.attribution.getNetTVL(partnerId);
+    const blendApy = await this.computeBlendApy();
     const tvl = tvlData.tvl;
     const sharePct = partner.revenue_share_pct as number;
     const annualYield = round2(tvl * blendApy);
@@ -59,8 +59,8 @@ export class RevenueService {
     };
   }
 
-  private computeBlendApy(): number {
-    const vaults = this.store.filter<any>('vaults', (v) => v.status === 'active');
+  private async computeBlendApy(): Promise<number> {
+    const vaults = await this.store.filter<any>('vaults', (v) => v.status === 'active');
     if (vaults.length === 0) return 0;
     const totalAlloc = vaults.reduce((s: number, v: any) => s + ((v.allocation_pct as number) || 0), 0);
     if (totalAlloc > 0) {

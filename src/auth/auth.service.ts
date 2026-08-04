@@ -20,10 +20,7 @@ interface ApiKey {
 }
 
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-
 const ASSIGNABLE_SCOPES = new Set(['read', 'write', 'partner:read', 'partner:admin']);
-const PRIVILEGED_SCOPES = new Set(['*', 'keys:admin']);
-
 const PUBLIC_KEY_FIELDS = [
   'id', 'object', 'label', 'prefix', 'environment',
   'created_at', 'last_used_at', 'revoked', 'scopes', 'partner_id',
@@ -38,12 +35,13 @@ export class AuthService {
     private readonly crypto: CryptoService,
   ) {}
 
-  authenticate(secret: string): { key: ApiKey } | { error: string } {
+  async authenticate(secret: string): Promise<{ key: ApiKey } | { error: string }> {
     if (!secret.startsWith('tsk_test_') && !secret.startsWith('tsk_live_')) {
       return { error: 'Malformed API key. Keys start with tsk_test_ or tsk_live_.' };
     }
     const hash = this.crypto.hashSecret(secret);
-    const key = this.store.filter<ApiKey>('keys', (k) => k.secret_hash === hash)[0];
+    const matches = await this.store.filter<ApiKey>('keys', (k) => k.secret_hash === hash);
+    const key = matches[0];
     if (!key) {
       return { error: 'Invalid API key.' };
     }
@@ -51,6 +49,7 @@ export class AuthService {
       return { error: 'This API key has been revoked.' };
     }
     key.last_used_at = new Date().toISOString();
+    await this.store.update<ApiKey>('keys', key.id, { last_used_at: key.last_used_at } as Partial<ApiKey>);
     return { key };
   }
 
@@ -59,12 +58,12 @@ export class AuthService {
     return scopes.includes('*') || scopes.includes(scope);
   }
 
-  generateKey(opts: {
+  async generateKey(opts: {
     label: string;
     environment?: string;
     scopes?: string[];
     partner_id?: string;
-  }): ApiKey & { _plaintext_secret: string } {
+  }): Promise<ApiKey & { _plaintext_secret: string }> {
     const environment = 'test';
     const prefix = 'tsk_test_';
     const sanitizedScopes = (opts.scopes ?? []).filter((s) => ASSIGNABLE_SCOPES.has(s));
@@ -89,7 +88,7 @@ export class AuthService {
       scopes: finalScopes,
       partner_id: opts.partner_id ?? null,
     };
-    this.store.create('keys', key);
+    await this.store.create('keys', key);
     return { ...key, _plaintext_secret: plainSecret };
   }
 
@@ -108,11 +107,11 @@ export class AuthService {
     return safe as Record<string, unknown> & { secret: string };
   }
 
-  listKeys(): ApiKey[] {
+  async listKeys(): Promise<ApiKey[]> {
     return this.store.all<ApiKey>('keys');
   }
 
-  revokeKey(id: string): ApiKey | null {
+  async revokeKey(id: string): Promise<ApiKey | null> {
     return this.store.update<ApiKey>('keys', id, { revoked: true } as Partial<ApiKey>);
   }
 }

@@ -1,26 +1,31 @@
+import { DataSource } from 'typeorm';
 import { StoreService } from '../store/store.service';
 import { AttributionService } from './attribution.service';
 import { RevenueService } from './revenue.service';
+import { createTestStore, destroyTestStore } from '../test/create-test-store';
 
 describe('RevenueService', () => {
+  let dataSource: DataSource;
   let store: StoreService;
   let attribution: AttributionService;
   let service: RevenueService;
 
-  beforeEach(() => {
-    delete (globalThis as any).__thesaurosNestStore;
-    store = new StoreService();
-    store.onModuleInit();
+  beforeEach(async () => {
+    ({ dataSource, store } = await createTestStore());
     attribution = new AttributionService(store);
     service = new RevenueService(store, attribution);
   });
 
-  it('returns null for non-existent partner', () => {
-    expect(service.calculateRevenueShare('ptn_nope')).toBeNull();
+  afterEach(async () => {
+    await destroyTestStore(dataSource);
   });
 
-  it('calculates revenue share for Acme', () => {
-    const result = service.calculateRevenueShare('ptn_seed_acme');
+  it('returns null for non-existent partner', async () => {
+    expect(await service.calculateRevenueShare('ptn_nope')).toBeNull();
+  });
+
+  it('calculates revenue share for Acme', async () => {
+    const result = await service.calculateRevenueShare('ptn_seed_acme');
     expect(result).not.toBeNull();
     expect(result!.object).toBe('revenue_share');
     expect(result!.partner_id).toBe('ptn_seed_acme');
@@ -33,9 +38,9 @@ describe('RevenueService', () => {
     expect(result!.annual.partner_revenue).toBeGreaterThan(result!.daily.partner_revenue);
   });
 
-  it('Orbit has higher share pct than Acme', () => {
-    const acme = service.calculateRevenueShare('ptn_seed_acme')!;
-    const orbit = service.calculateRevenueShare('ptn_seed_orbit')!;
+  it('Orbit has higher share pct than Acme', async () => {
+    const acme = (await service.calculateRevenueShare('ptn_seed_acme'))!;
+    const orbit = (await service.calculateRevenueShare('ptn_seed_orbit'))!;
     expect(orbit.revenue_share_pct).toBeGreaterThan(acme.revenue_share_pct);
   });
 });

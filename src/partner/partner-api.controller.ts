@@ -4,9 +4,8 @@ import {
   Get,
   NotFoundException,
   Param,
-  Query,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { PartnerId } from '../common/decorators';
 import { RequiredScope } from '../common/decorators';
 import { PartnerService } from './partner.service';
@@ -35,18 +34,18 @@ export class PartnerApiController {
   }
 
   @Get('summary')
-  @ApiOperation({ summary: 'Partner summary', description: 'Full dashboard summary auto-scoped to the authenticated partner key.' })
+  @ApiOperation({ summary: 'Partner summary' })
   @ApiOkResponse({ type: PartnerSummaryOutputDto })
-  getSummary(@PartnerId() partnerId: string | null): PartnerSummaryOutputDto {
+  async getSummary(@PartnerId() partnerId: string | null): Promise<PartnerSummaryOutputDto> {
     const pid = this.requirePartnerId(partnerId);
-    const partner = this.partnerService.getPartner(pid);
+    const partner = await this.partnerService.getPartner(pid);
     if (!partner) throw new NotFoundException('Partner not found.');
-    const users = this.attribution.getAttributedUsers(pid);
-    const deposits = this.attribution.getAttributedDeposits(pid);
-    const tvl = this.attribution.getNetTVL(pid);
-    const yieldData = this.attribution.getAttributedYield(pid);
-    const points = this.attribution.getAttributedPoints(pid);
-    const revenueData = this.revenue.calculateRevenueShare(pid);
+    const users = await this.attribution.getAttributedUsers(pid);
+    const deposits = await this.attribution.getAttributedDeposits(pid);
+    const tvl = await this.attribution.getNetTVL(pid);
+    const yieldData = await this.attribution.getAttributedYield(pid);
+    const points = await this.attribution.getAttributedPoints(pid);
+    const revenueData = await this.revenue.calculateRevenueShare(pid);
     return {
       object: 'partner_summary',
       partner: { id: partner.id, name: partner.name as string, slug: partner.slug as string, status: partner.status as string },
@@ -66,44 +65,44 @@ export class PartnerApiController {
 
   @Get('users')
   @ApiOperation({ summary: 'Attributed users' })
-  getUsers(@PartnerId() partnerId: string | null): unknown[] {
+  async getUsers(@PartnerId() partnerId: string | null): Promise<unknown[]> {
     const pid = this.requirePartnerId(partnerId);
     return this.attribution.getAttributedUsers(pid);
   }
 
   @Get('deposits')
   @ApiOperation({ summary: 'Attributed deposits' })
-  getDeposits(@PartnerId() partnerId: string | null): unknown {
+  async getDeposits(@PartnerId() partnerId: string | null): Promise<unknown> {
     const pid = this.requirePartnerId(partnerId);
-    return { object: 'partner_deposits', partner_id: pid, ...this.attribution.getAttributedDeposits(pid) };
+    return { object: 'partner_deposits', partner_id: pid, ...(await this.attribution.getAttributedDeposits(pid)) };
   }
 
   @Get('withdrawals')
   @ApiOperation({ summary: 'Attributed withdrawals' })
-  getWithdrawals(@PartnerId() partnerId: string | null): unknown {
+  async getWithdrawals(@PartnerId() partnerId: string | null): Promise<unknown> {
     const pid = this.requirePartnerId(partnerId);
-    return { object: 'partner_withdrawals', partner_id: pid, ...this.attribution.getAttributedWithdrawals(pid) };
+    return { object: 'partner_withdrawals', partner_id: pid, ...(await this.attribution.getAttributedWithdrawals(pid)) };
   }
 
   @Get('tvl')
   @ApiOperation({ summary: 'Net TVL for partner' })
-  getTvl(@PartnerId() partnerId: string | null): unknown {
+  async getTvl(@PartnerId() partnerId: string | null): Promise<unknown> {
     const pid = this.requirePartnerId(partnerId);
-    return { object: 'partner_tvl', partner_id: pid, ...this.attribution.getNetTVL(pid) };
+    return { object: 'partner_tvl', partner_id: pid, ...(await this.attribution.getNetTVL(pid)) };
   }
 
   @Get('yield')
   @ApiOperation({ summary: 'Attributed yield' })
-  getYield(@PartnerId() partnerId: string | null): unknown {
+  async getYield(@PartnerId() partnerId: string | null): Promise<unknown> {
     const pid = this.requirePartnerId(partnerId);
-    return { object: 'partner_yield', partner_id: pid, ...this.attribution.getAttributedYield(pid) };
+    return { object: 'partner_yield', partner_id: pid, ...(await this.attribution.getAttributedYield(pid)) };
   }
 
   @Get('yield/history/:asset')
   @ApiParam({ name: 'asset', enum: ['USDC', 'USDT'] })
-  @ApiOperation({ summary: 'Yield history for asset', description: 'Deterministic 30-day history for the requested asset.' })
-  getYieldHistory(@Param('asset') asset: string): unknown {
-    const vaults = this.store.filter<any>('vaults', (v) => v.asset === asset.toUpperCase() && v.status === 'active');
+  @ApiOperation({ summary: 'Yield history for asset' })
+  async getYieldHistory(@Param('asset') asset: string): Promise<unknown> {
+    const vaults = await this.store.filter<any>('vaults', (v) => v.asset === asset.toUpperCase() && v.status === 'active');
     if (vaults.length === 0) throw new NotFoundException(`Unsupported asset "${asset}".`);
     const totalAlloc = vaults.reduce((s: number, v: any) => s + ((v.allocation_pct as number) || 0), 0);
     const blendApy = totalAlloc > 0
@@ -134,17 +133,17 @@ export class PartnerApiController {
 
   @Get('points')
   @ApiOperation({ summary: 'Attributed points' })
-  getPoints(@PartnerId() partnerId: string | null): unknown {
+  async getPoints(@PartnerId() partnerId: string | null): Promise<unknown> {
     const pid = this.requirePartnerId(partnerId);
-    return { object: 'partner_points', partner_id: pid, ...this.attribution.getAttributedPoints(pid) };
+    return { object: 'partner_points', partner_id: pid, ...(await this.attribution.getAttributedPoints(pid)) };
   }
 
   @Get('revenue')
   @ApiOperation({ summary: 'Revenue share calculation' })
   @ApiOkResponse({ type: RevenueShareOutputDto })
-  getRevenue(@PartnerId() partnerId: string | null): RevenueShareOutputDto {
+  async getRevenue(@PartnerId() partnerId: string | null): Promise<RevenueShareOutputDto> {
     const pid = this.requirePartnerId(partnerId);
-    const result = this.revenue.calculateRevenueShare(pid);
+    const result = await this.revenue.calculateRevenueShare(pid);
     if (!result) throw new NotFoundException('Partner not found.');
     return result as unknown as RevenueShareOutputDto;
   }
@@ -152,15 +151,15 @@ export class PartnerApiController {
   @Get('user/:id/positions')
   @ApiParam({ name: 'id', example: 'usr_seed_nova' })
   @ApiOperation({ summary: 'User positions (partner-scoped)' })
-  getUserPositions(
+  async getUserPositions(
     @PartnerId() partnerId: string | null,
     @Param('id') userId: string,
-  ): unknown {
+  ): Promise<unknown> {
     const pid = this.requirePartnerId(partnerId);
-    if (!this.attribution.isUserAttributedToPartner(userId, pid)) {
+    if (!(await this.attribution.isUserAttributedToPartner(userId, pid))) {
       throw new ForbiddenException('This user is not attributed to your partner account.');
     }
-    const positions = this.store.filter<any>('positions', (p) => p.user_id === userId);
+    const positions = await this.store.filter<any>('positions', (p) => p.user_id === userId);
     return positions.map((p: any) => {
       const apy = (p.apy as number) ?? 0;
       const openedMs = Date.parse(p.opened_at as string);

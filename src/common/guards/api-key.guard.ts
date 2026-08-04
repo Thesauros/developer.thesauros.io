@@ -18,7 +18,7 @@ export class ApiKeyGuard implements CanActivate {
     private readonly reflector: Reflector,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -31,7 +31,7 @@ export class ApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('Missing Authorization header. Use "Authorization: Bearer <key>".');
     }
     const secret = match[1].trim();
-    const result = this.authService.authenticate(secret);
+    const result = await this.authService.authenticate(secret);
     if ('error' in result) {
       throw new UnauthorizedException(result.error);
     }

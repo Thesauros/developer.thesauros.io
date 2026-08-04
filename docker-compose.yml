@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: thesauros-partner-pg
+    restart: unless-stopped
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER:-thesauros}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-thesauros}
+      POSTGRES_DB: ${DB_NAME:-thesauros_partner}
+    volumes:
+      - thesauros_partner_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-thesauros} -d ${DB_NAME:-thesauros_partner}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  thesauros_partner_pg:

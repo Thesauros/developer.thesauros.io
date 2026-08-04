@@ -44,20 +44,16 @@ function round2(n: number): number {
 export class AttributionService {
   constructor(private readonly store: StoreService) {}
 
-  /* ---------------------------------------------------------------- *
-   * Attribution CRUD
-   * ---------------------------------------------------------------- */
-
-  attributeUser(data: {
+  async attributeUser(data: {
     user_id: string;
     partner_id: string;
     campaign_id?: string;
     source?: string;
-  }): Attribution {
-    const existing = this.store.filter<Attribution>(
+  }): Promise<Attribution> {
+    const existing = (await this.store.filter<Attribution>(
       'attributions',
       (a) => a.user_id === data.user_id,
-    )[0];
+    ))[0];
     if (existing) return existing;
     return this.store.create<Attribution>('attributions', {
       id: this.store.randomId('atr'),
@@ -70,46 +66,32 @@ export class AttributionService {
     });
   }
 
-  getAttribution(userId: string): Attribution | null {
-    return this.store.filter<Attribution>('attributions', (a) => a.user_id === userId)[0] ?? null;
+  async getAttribution(userId: string): Promise<Attribution | null> {
+    return (await this.store.filter<Attribution>('attributions', (a) => a.user_id === userId))[0] ?? null;
   }
 
-  listAttributions(partnerId: string): Attribution[] {
+  async listAttributions(partnerId: string): Promise<Attribution[]> {
     return this.store.filter<Attribution>('attributions', (a) => a.partner_id === partnerId);
   }
 
-  isUserAttributedToPartner(userId: string, partnerId: string): boolean {
-    const attr = this.getAttribution(userId);
+  async isUserAttributedToPartner(userId: string, partnerId: string): Promise<boolean> {
+    const attr = await this.getAttribution(userId);
     return attr !== null && attr.partner_id === partnerId;
   }
 
-  /* ---------------------------------------------------------------- *
-   * Attributed users
-   * ---------------------------------------------------------------- */
-
-  getAttributedUsers(partnerId: string): (User & { attribution: Attribution | null })[] {
-    const attributions = this.listAttributions(partnerId);
+  async getAttributedUsers(partnerId: string): Promise<(User & { attribution: Attribution | null })[]> {
+    const attributions = await this.listAttributions(partnerId);
     const userIds = new Set(attributions.map((a) => a.user_id));
-    return this.store.filter<User>('users', (u) => userIds.has(u.id)).map((u) => ({
+    const users = await this.store.filter<User>('users', (u) => userIds.has(u.id));
+    return users.map((u) => ({
       ...u,
       attribution: attributions.find((a) => a.user_id === u.id) ?? null,
     }));
   }
 
-  /* ---------------------------------------------------------------- *
-   * Partner-scoped positions
-   * ---------------------------------------------------------------- */
-
-  private getPartnerPositions(partnerId: string): Position[] {
-    return this.store.filter<Position>(
-      'positions',
-      (p) => p.partner_id === partnerId,
-    );
+  private async getPartnerPositions(partnerId: string): Promise<Position[]> {
+    return this.store.filter<Position>('positions', (p) => p.partner_id === partnerId);
   }
-
-  /* ---------------------------------------------------------------- *
-   * Aggregation
-   * ---------------------------------------------------------------- */
 
   private withAccrual(position: Position): Position & { current_value: number; accrued_yield: number } {
     const apy = position.apy ?? 0;
@@ -121,12 +103,12 @@ export class AttributionService {
     return { ...position, current_value, accrued_yield };
   }
 
-  getAttributedDeposits(partnerId: string): {
+  async getAttributedDeposits(partnerId: string): Promise<{
     total: number;
     count: number;
     deposits: { position_id: string; user_id: string | null; wallet: string; asset: string; principal: number; opened_at: string }[];
-  } {
-    const positions = this.getPartnerPositions(partnerId);
+  }> {
+    const positions = await this.getPartnerPositions(partnerId);
     const deposits = positions
       .filter((p) => p.status !== 'closed')
       .map((p) => ({
@@ -144,11 +126,8 @@ export class AttributionService {
     };
   }
 
-  getAttributedWithdrawals(partnerId: string): {
-    total: number;
-    count: number;
-  } {
-    const positions = this.getPartnerPositions(partnerId);
+  async getAttributedWithdrawals(partnerId: string): Promise<{ total: number; count: number }> {
+    const positions = await this.getPartnerPositions(partnerId);
     let total = 0;
     let count = 0;
     for (const p of positions) {
@@ -164,11 +143,11 @@ export class AttributionService {
     return { total, count };
   }
 
-  getNetTVL(partnerId: string): {
+  async getNetTVL(partnerId: string): Promise<{
     tvl: number;
     breakdown: { asset: string; tvl: number; positions: number }[];
-  } {
-    const positions = this.getPartnerPositions(partnerId).filter((p) => p.status === 'active');
+  }> {
+    const positions = (await this.getPartnerPositions(partnerId)).filter((p) => p.status === 'active');
     let tvl = 0;
     const byAsset: Record<string, { asset: string; tvl: number; positions: number }> = {};
     for (const raw of positions) {
@@ -181,11 +160,11 @@ export class AttributionService {
     return { tvl, breakdown: Object.values(byAsset) };
   }
 
-  getAttributedYield(partnerId: string): {
+  async getAttributedYield(partnerId: string): Promise<{
     total_yield: number;
     positions: { position_id: string; asset: string; principal: number; accrued_yield: number; apy: number }[];
-  } {
-    const positions = this.getPartnerPositions(partnerId);
+  }> {
+    const positions = await this.getPartnerPositions(partnerId);
     let totalYield = 0;
     const details = positions.map((raw) => {
       const p = this.withAccrual(raw);
@@ -201,14 +180,15 @@ export class AttributionService {
     return { total_yield: totalYield, positions: details };
   }
 
-  getAttributedPoints(partnerId: string): {
+  async getAttributedPoints(partnerId: string): Promise<{
     total_points: number;
     users: { user_id: string; label: string; points: number }[];
-  } {
-    const users = this.getAttributedUsers(partnerId);
+  }> {
+    const users = await this.getAttributedUsers(partnerId);
     let totalPoints = 0;
-    const breakdown = users.map((u) => {
-      const locks = this.store.filter('locks', (l: any) =>
+    const breakdown = [];
+    for (const u of users) {
+      const locks = await this.store.filter('locks', (l: any) =>
         u.wallets.some((w: string) => w.toLowerCase() === (l.userAddress ?? '').toLowerCase()),
       );
       let points = 0;
@@ -216,8 +196,8 @@ export class AttributionService {
         points += (Number((l as any).amount) || 0) * (Number((l as any).duration) || 0);
       }
       totalPoints += points;
-      return { user_id: u.id, label: u.label, points };
-    });
+      breakdown.push({ user_id: u.id, label: u.label, points });
+    }
     return { total_points: totalPoints, users: breakdown };
   }
 }

@@ -36,21 +36,17 @@ const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/;
 export class PartnerService {
   constructor(private readonly store: StoreService) {}
 
-  /* ---------------------------------------------------------------- *
-   * Partners
-   * ---------------------------------------------------------------- */
-
-  createPartner(data: {
+  async createPartner(data: {
     name: string;
     slug?: string;
     contact_email?: string;
     webhook_url?: string;
     revenue_share_pct?: number;
     metadata?: Record<string, unknown>;
-  }): Partner {
+  }): Promise<Partner> {
     const slug = this.normalizeSlug(data.slug || data.name);
     this.validateSlug(slug);
-    const existing = this.store.filter<Partner>('partners', (p) => p.slug === slug)[0];
+    const existing = (await this.store.filter<Partner>('partners', (p) => p.slug === slug))[0];
     if (existing) {
       throw new ConflictException(`Slug "${slug}" is already taken by partner "${existing.name}".`);
     }
@@ -72,27 +68,27 @@ export class PartnerService {
     });
   }
 
-  getPartner(id: string): Partner | null {
+  async getPartner(id: string): Promise<Partner | null> {
     return this.store.get<Partner>('partners', id);
   }
 
-  getPartnerBySlug(slug: string): Partner | null {
-    return this.store.filter<Partner>('partners', (p) => p.slug === slug)[0] ?? null;
+  async getPartnerBySlug(slug: string): Promise<Partner | null> {
+    return (await this.store.filter<Partner>('partners', (p) => p.slug === slug))[0] ?? null;
   }
 
-  listPartners(status?: string): Partner[] {
+  async listPartners(status?: string): Promise<Partner[]> {
     if (status) return this.store.filter<Partner>('partners', (p) => p.status === status);
     return this.store.all<Partner>('partners');
   }
 
-  updatePartner(id: string, patch: Partial<Partner>): Partner | null {
+  async updatePartner(id: string, patch: Partial<Partner>): Promise<Partner | null> {
     if (patch.slug) {
       const slug = this.normalizeSlug(patch.slug);
       this.validateSlug(slug);
-      const conflict = this.store.filter<Partner>(
+      const conflict = (await this.store.filter<Partner>(
         'partners',
         (p) => p.slug === slug && p.id !== id,
-      )[0];
+      ))[0];
       if (conflict) throw new ConflictException(`Slug "${slug}" is already taken.`);
       patch.slug = slug;
     }
@@ -103,22 +99,18 @@ export class PartnerService {
     return this.store.update<Partner>('partners', id, patch);
   }
 
-  /* ---------------------------------------------------------------- *
-   * Campaigns
-   * ---------------------------------------------------------------- */
-
-  createCampaign(partnerId: string, data: {
+  async createCampaign(partnerId: string, data: {
     name: string;
     slug?: string;
     utm_source?: string;
     utm_medium?: string;
-  }): Campaign {
+  }): Promise<Campaign> {
     const slug = this.normalizeSlug(data.slug || data.name);
     this.validateSlug(slug);
-    const conflict = this.store.filter<Campaign>(
+    const conflict = (await this.store.filter<Campaign>(
       'campaigns',
       (c) => c.partner_id === partnerId && c.slug === slug,
-    )[0];
+    ))[0];
     if (conflict) {
       throw new ConflictException(`Campaign slug "${slug}" already exists for this partner.`);
     }
@@ -137,17 +129,13 @@ export class PartnerService {
     });
   }
 
-  listCampaigns(partnerId: string): Campaign[] {
+  async listCampaigns(partnerId: string): Promise<Campaign[]> {
     return this.store.filter<Campaign>('campaigns', (c) => c.partner_id === partnerId);
   }
 
-  getCampaign(id: string): Campaign | null {
+  async getCampaign(id: string): Promise<Campaign | null> {
     return this.store.get<Campaign>('campaigns', id);
   }
-
-  /* ---------------------------------------------------------------- *
-   * Helpers
-   * ---------------------------------------------------------------- */
 
   private normalizeSlug(raw: string): string {
     return raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
