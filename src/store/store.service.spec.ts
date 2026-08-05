@@ -39,7 +39,7 @@ describe('StoreService', () => {
 
   it('seeds keys with partner scoping', async () => {
     const keys = await store.all('keys');
-    expect(keys.length).toBe(3);
+    expect(keys.length).toBe(4);
     const acmeKey = keys.find((k: any) => k.id === 'key_seed_acme');
     expect(acmeKey).toBeDefined();
     expect(acmeKey!.partner_id).toBe('ptn_seed_acme');

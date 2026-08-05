@@ -16,6 +16,7 @@ import {
   CreatePartnerInputDto,
   UpdatePartnerInputDto,
   CreateCampaignInputDto,
+  UpdateCampaignInputDto,
   PartnerOutputDto,
   CampaignOutputDto,
 } from './dto';
@@ -73,7 +74,10 @@ export class PartnerController {
 
   @Patch(':id')
   @ApiParam({ name: 'id', example: 'ptn_seed_acme' })
-  @ApiOperation({ summary: 'Update partner' })
+  @ApiOperation({
+    summary: 'Update partner',
+    description: 'Partial update. Pass status:"disabled" to soft-disable without deleting history/attributions.',
+  })
   @ApiOkResponse({ type: PartnerOutputDto })
   async updatePartner(@Param('id') id: string, @Body() dto: UpdatePartnerInputDto): Promise<PartnerOutputDto> {
     const partner = await this.partnerService.updatePartner(id, dto as any);
@@ -94,10 +98,34 @@ export class PartnerController {
   @Get(':id/campaigns')
   @ApiParam({ name: 'id', example: 'ptn_seed_acme' })
   @ApiOperation({ summary: 'List campaigns for partner' })
+  @ApiQuery({ name: 'status', required: false, enum: ['active', 'disabled'] })
   @ApiOkResponse({ type: [CampaignOutputDto] })
-  async listCampaigns(@Param('id') id: string): Promise<CampaignOutputDto[]> {
+  async listCampaigns(
+    @Param('id') id: string,
+    @Query('status') status?: string,
+  ): Promise<CampaignOutputDto[]> {
     const partner = await this.partnerService.getPartner(id);
     if (!partner) throw new NotFoundException(`Partner "${id}" not found.`);
-    return await this.partnerService.listCampaigns(id) as unknown as CampaignOutputDto[];
+    return await this.partnerService.listCampaigns(id, status) as unknown as CampaignOutputDto[];
+  }
+
+  @Patch(':id/campaigns/:campaignId')
+  @ApiParam({ name: 'id', example: 'ptn_seed_acme' })
+  @ApiParam({ name: 'campaignId', example: 'cmp_seed_acme_launch' })
+  @ApiOperation({
+    summary: 'Update campaign',
+    description: 'Partial update. Pass status:"disabled" to soft-disable a campaign without deleting it.',
+  })
+  @ApiOkResponse({ type: CampaignOutputDto })
+  async updateCampaign(
+    @Param('id') id: string,
+    @Param('campaignId') campaignId: string,
+    @Body() dto: UpdateCampaignInputDto,
+  ): Promise<CampaignOutputDto> {
+    const partner = await this.partnerService.getPartner(id);
+    if (!partner) throw new NotFoundException(`Partner "${id}" not found.`);
+    const campaign = await this.partnerService.updateCampaign(id, campaignId, dto as any);
+    if (!campaign) throw new NotFoundException(`Campaign "${campaignId}" not found for partner "${id}".`);
+    return campaign as unknown as CampaignOutputDto;
   }
 }

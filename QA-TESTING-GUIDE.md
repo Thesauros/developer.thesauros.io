@@ -219,13 +219,18 @@ curl https://partner-api-production-10ad.up.railway.app/api/v1/partners/ptn_seed
 
 ```bash
 curl -X PATCH https://partner-api-production-10ad.up.railway.app/api/v1/partners/ptn_seed_acme \
-  -H "Authorization: Bearer <КЛЮЧ_С_partner:admin>" \
+  -H "Authorization: Bearer tsk_test_master_full_access_000000000000000" \
   -H "Content-Type: application/json" \
-  -d '{"revenue_share_pct": 0.18}'
+  -d '{"status": "disabled"}'
 ```
+
+**Зачем `status`:** hard-delete партнёра/кампании через API нет намеренно — attribution, позиции и revenue-история должны сохраняться. Soft-disable (`active` → `disabled`) выключает партнёра/кампанию без потери данных. Вернуть можно тем же PATCH с `"status": "active"`.
 
 **Тест-кейсы:**
 - [ ] Обновление `revenue_share_pct` → значение изменилось
+- [ ] `{"status":"disabled"}` → партнёр disabled, виден в `GET /partners?status=disabled`
+- [ ] `{"status":"active"}` → снова active
+- [ ] `{"status":"deleted"}` → **400**
 - [ ] `updated_at` обновился
 - [ ] Несуществующий ID → **404**
 
@@ -233,7 +238,7 @@ curl -X PATCH https://partner-api-production-10ad.up.railway.app/api/v1/partners
 
 ```bash
 curl -X POST https://partner-api-production-10ad.up.railway.app/api/v1/partners/ptn_seed_acme/campaigns \
-  -H "Authorization: Bearer <КЛЮЧ_С_partner:admin>" \
+  -H "Authorization: Bearer tsk_test_master_full_access_000000000000000" \
   -H "Content-Type: application/json" \
   -d '{"name": "Test Campaign", "slug": "test-campaign", "utm_source": "test", "utm_medium": "manual"}'
 ```
@@ -242,12 +247,27 @@ curl -X POST https://partner-api-production-10ad.up.railway.app/api/v1/partners/
 
 ```bash
 curl https://partner-api-production-10ad.up.railway.app/api/v1/partners/ptn_seed_acme/campaigns \
-  -H "Authorization: Bearer <КЛЮЧ_С_partner:admin>"
+  -H "Authorization: Bearer tsk_test_master_full_access_000000000000000"
 ```
 
 **Тест-кейсы:**
 - [ ] Acme → 2 кампании (`cmp_seed_acme_launch`, `cmp_seed_acme_earn`)
 - [ ] Orbit → 2 кампании (`cmp_seed_orbit_q3`, `cmp_seed_orbit_app`)
+- [ ] `?status=disabled` после soft-disable кампании
+
+#### `PATCH /api/v1/partners/:id/campaigns/:campaignId` — Обновить / дизейблить кампанию
+
+```bash
+curl -X PATCH https://partner-api-production-10ad.up.railway.app/api/v1/partners/ptn_seed_acme/campaigns/cmp_seed_acme_launch \
+  -H "Authorization: Bearer tsk_test_master_full_access_000000000000000" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "disabled"}'
+```
+
+**Тест-кейсы:**
+- [ ] `status: disabled` → кампания выключена
+- [ ] Чужой `campaignId` для партнёра → **404**
+- [ ] Можно менять `name` / `utm_source` / `utm_medium`
 
 ---
 

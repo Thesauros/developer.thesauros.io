@@ -95,6 +95,9 @@ export class PartnerService {
     if (patch.revenue_share_pct !== undefined) {
       patch.revenue_share_pct = Math.min(1, Math.max(0, patch.revenue_share_pct));
     }
+    if (patch.status !== undefined) {
+      this.validateStatus(patch.status);
+    }
     patch.updated_at = new Date().toISOString();
     return this.store.update<Partner>('partners', id, patch);
   }
@@ -129,12 +132,41 @@ export class PartnerService {
     });
   }
 
-  async listCampaigns(partnerId: string): Promise<Campaign[]> {
-    return this.store.filter<Campaign>('campaigns', (c) => c.partner_id === partnerId);
+  async listCampaigns(partnerId: string, status?: string): Promise<Campaign[]> {
+    return this.store.filter<Campaign>(
+      'campaigns',
+      (c) => c.partner_id === partnerId && (!status || c.status === status),
+    );
   }
 
   async getCampaign(id: string): Promise<Campaign | null> {
     return this.store.get<Campaign>('campaigns', id);
+  }
+
+  async updateCampaign(
+    partnerId: string,
+    campaignId: string,
+    patch: Partial<Campaign>,
+  ): Promise<Campaign | null> {
+    const campaign = await this.getCampaign(campaignId);
+    if (!campaign || campaign.partner_id !== partnerId) {
+      return null;
+    }
+    if (patch.slug) {
+      const slug = this.normalizeSlug(patch.slug);
+      this.validateSlug(slug);
+      const conflict = (await this.store.filter<Campaign>(
+        'campaigns',
+        (c) => c.partner_id === partnerId && c.slug === slug && c.id !== campaignId,
+      ))[0];
+      if (conflict) throw new ConflictException(`Campaign slug "${slug}" already exists for this partner.`);
+      patch.slug = slug;
+    }
+    if (patch.status !== undefined) {
+      this.validateStatus(patch.status);
+    }
+    patch.updated_at = new Date().toISOString();
+    return this.store.update<Campaign>('campaigns', campaignId, patch);
   }
 
   private normalizeSlug(raw: string): string {
@@ -146,6 +178,12 @@ export class PartnerService {
       throw new BadRequestException(
         'Slug must be 3-50 chars, lowercase alphanumeric + hyphens, no leading/trailing hyphen.',
       );
+    }
+  }
+
+  private validateStatus(status: string): void {
+    if (status !== 'active' && status !== 'disabled') {
+      throw new BadRequestException('Status must be "active" or "disabled".');
     }
   }
 }

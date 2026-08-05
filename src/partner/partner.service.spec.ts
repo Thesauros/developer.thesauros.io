@@ -61,6 +61,18 @@ describe('PartnerService', () => {
     it('returns null for non-existent ID', async () => {
       expect(await service.updatePartner('ptn_nope', { name: 'X' })).toBeNull();
     });
+
+    it('disables a partner via status', async () => {
+      const updated = await service.updatePartner('ptn_seed_acme', { status: 'disabled' });
+      expect(updated!.status).toBe('disabled');
+      const disabled = await service.listPartners('disabled');
+      expect(disabled.map((p) => p.id)).toContain('ptn_seed_acme');
+    });
+
+    it('rejects invalid status', async () => {
+      await expect(service.updatePartner('ptn_seed_acme', { status: 'deleted' }))
+        .rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('campaigns', () => {
@@ -78,6 +90,23 @@ describe('PartnerService', () => {
     it('lists campaigns for a partner', async () => {
       const campaigns = await service.listCampaigns('ptn_seed_acme');
       expect(campaigns.length).toBe(2);
+    });
+
+    it('disables a campaign via status', async () => {
+      const updated = await service.updateCampaign(
+        'ptn_seed_acme',
+        'cmp_seed_acme_launch',
+        { status: 'disabled' },
+      );
+      expect(updated!.status).toBe('disabled');
+      const active = await service.listCampaigns('ptn_seed_acme', 'active');
+      expect(active.map((c) => c.id)).not.toContain('cmp_seed_acme_launch');
+    });
+
+    it('returns null when campaign belongs to another partner', async () => {
+      expect(
+        await service.updateCampaign('ptn_seed_orbit', 'cmp_seed_acme_launch', { status: 'disabled' }),
+      ).toBeNull();
     });
   });
 
