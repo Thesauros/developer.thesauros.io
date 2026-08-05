@@ -40,7 +40,7 @@ async function bootstrap(): Promise<void> {
     const document = SwaggerModule.createDocument(app, swagger);
     SwaggerModule.setup('swagger', app, document);
   }
-  const port = parseInt(process.env.API_PORT ?? '3001', 10);
+  const port = parseInt(process.env.PORT ?? process.env.API_PORT ?? '3001', 10);
   await app.listen(port);
   Logger.log(`Partner API running on http://localhost:${port} [${nodeEnv}]`);
   if (nodeEnv !== 'production') {
