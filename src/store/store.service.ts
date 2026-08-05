@@ -185,10 +185,12 @@ export class StoreService implements OnModuleInit {
   }
 
   private buildKeys(): ApiKeyEntity[] {
+    const masterSecret = 'tsk_test_master_full_access_000000000000000';
     const bootstrapSecret = 'tsk_test_thesauros_sandbox_0000000000000000';
     const acmeSecret = 'tsk_test_acme_partner_key_00000000000000000';
     const orbitSecret = 'tsk_test_orbit_partner_key_0000000000000000';
     return [
+      { id: 'key_master', object: 'api_key', label: 'Master full-access key (QA)', secret: masterSecret, secret_hash: sha256(masterSecret), prefix: 'tsk_test_mas', environment: 'test', created_at: daysAgo(90), last_used_at: null, revoked: false, scopes: ['read', 'write', 'keys:admin', 'partner:admin', 'partner:read'], partner_id: null },
       { id: 'key_bootstrap', object: 'api_key', label: 'Sandbox bootstrap key', secret: bootstrapSecret, secret_hash: sha256(bootstrapSecret), prefix: 'tsk_test_the', environment: 'test', created_at: daysAgo(90), last_used_at: null, revoked: false, scopes: ['read', 'write'], partner_id: null },
       { id: 'key_seed_acme', object: 'api_key', label: 'Acme Wallet partner key', secret: acmeSecret, secret_hash: sha256(acmeSecret), prefix: 'tsk_test_acm', environment: 'test', created_at: daysAgo(58), last_used_at: null, revoked: false, scopes: ['partner:read'], partner_id: 'ptn_seed_acme' },
       { id: 'key_seed_orbit', object: 'api_key', label: 'Orbit Finance partner key', secret: orbitSecret, secret_hash: sha256(orbitSecret), prefix: 'tsk_test_orb', environment: 'test', created_at: daysAgo(43), last_used_at: null, revoked: false, scopes: ['partner:read'], partner_id: 'ptn_seed_orbit' },
