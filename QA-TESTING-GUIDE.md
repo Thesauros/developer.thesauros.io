@@ -28,7 +28,8 @@
 |---|---|---|---|
 | **Keys** | `/api/v1/keys` | Админы Thesauros | Создание, просмотр и отзыв API-ключей |
 | **Partners (Admin)** | `/api/v1/partners` | Админы Thesauros | Создание и управление партнёрами, создание кампаний |
-| **Partner (Self-Service)** | `/api/v1/partner` | Партнёры | Просмотр своей статистики: пользователи, депозиты, TVL, yield, revenue share, позиции пользователей |
+| **Partner (Self-Service)** | `/api/v1/partner` | Партнёры | Просмотр **своей** статистики: пользователи, депозиты, TVL, yield, revenue share, позиции пользователей. Все ручки требуют ключ, привязанный к партнёру |
+| **Yield (Protocol)** | `/api/v1/yield` | Все | Протокольные показатели доходности, одинаковые для всех вызывающих. Привязка к партнёру не нужна |
 
 ---
 
@@ -355,13 +356,14 @@ curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/yield/his
   -H "Authorization: Bearer tsk_test_acme_partner_key_00000000000000000"
 ```
 
-**Важно:** ручка возвращает **протокольный** blended APY по активу (по всем активным ваултам Thesauros), а не данные конкретного партнёра — серия одинакова для всех партнёров. Это явно помечено полем `data.scope: "protocol"`. Тем не менее ключ должен быть привязан к партнёру, как и на остальных self-service ручках.
+> **Deprecated.** Используйте `GET /api/v1/yield/history/:asset` (см. раздел 3.4). Ручка возвращает **протокольный** blended APY — не партнёрские данные — поэтому её место не в `/partner/*`. Алиас сохранён, чтобы не ломать существующие интеграции, и отдаёт идентичный payload. Но, как и все ручки под `/partner/*`, он требует partner-scoped ключ.
 
 **Тест-кейсы:**
 - [ ] `USDC` → массив `history` из 30 точек, `blend_apy` > 0, `scope: "protocol"`
 - [ ] `USDT` → аналогично
 - [ ] `ETH` → **404** "Unsupported asset"
 - [ ] Ключ со скоупом `partner:read`, но с `partner_id: null` → **403** "requires a partner-scoped API key"
+- [ ] Payload побайтово совпадает с `GET /api/v1/yield/history/:asset`
 
 #### `GET /api/v1/partner/points` — Начисленные поинты
 
@@ -376,6 +378,8 @@ curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/revenue \
 - [ ] `revenue_share_pct` = 0.15 для Acme
 - [ ] Содержит `annual` и `daily` расчёты
 - [ ] `partner_revenue` > 0
+- [ ] `protocol_blend_apy` — **одинаков** у Acme и Orbit (это ставка протокола, не партнёрская). Поле раньше называлось `blend_apy`
+- [ ] `tvl` — наоборот, у партнёров **разный**
 
 #### `GET /api/v1/partner/user/:id/positions` — Позиции пользователя
 
@@ -388,6 +392,35 @@ curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/user/usr_
 - [ ] `usr_seed_nova` через Acme-ключ → 2 позиции (`pos_seed_alpha`, `pos_seed_gamma`) + `current_value` и `accrued_yield`
 - [ ] `usr_seed_quill` через Acme-ключ → **403** "not attributed to your partner"
 - [ ] `usr_seed_quill` через Orbit-ключ → 1 позиция (`pos_seed_delta`)
+
+---
+
+### 3.4 Protocol Yield (`/api/v1/yield`)
+
+Требуемый скоуп: `read` **или** `partner:read`. Привязка к партнёру **не нужна** — данные протокольные.
+
+Правило, по которому разведены namespace'ы:
+
+| Namespace | Что внутри | Ключ |
+|---|---|---|
+| `/api/v1/partner/*` | Только партнёрские данные. Все ручки требуют ключ с `partner_id` | partner-scoped |
+| `/api/v1/yield/*` | Протокольные показатели, одинаковые для всех | любой `read` / `partner:read`, `partner_id` не нужен |
+
+#### `GET /api/v1/yield/history/:asset` — История blended APY по активу
+
+```bash
+curl https://partner-api-production-10ad.up.railway.app/api/v1/yield/history/USDC \
+  -H "Authorization: Bearer tsk_test_master_full_access_000000000000000"
+```
+
+Аллокационно-взвешенный APY по всем активным ваултам Thesauros для актива. Серия **одинакова для всех вызывающих** — это витринный показатель протокола, а не привлечённые партнёром средства. Помечено полем `data.scope: "protocol"`. Ряд детерминированный (sandbox), а не реальная историческая выгрузка.
+
+**Тест-кейсы:**
+- [ ] `USDC` → `scope: "protocol"`, `blend_apy` > 0, `history` из 30 точек
+- [ ] Ответ у Acme-ключа, Orbit-ключа и master-ключа (`partner_id: null`) **идентичен**
+- [ ] Ключ с `partner:read` и `partner_id: null` → **200** (в отличие от deprecated-алиаса под `/partner/*`)
+- [ ] Ключ без `read` и без `partner:read` → **403**
+- [ ] `ETH` → **404** "Unsupported asset"
 
 ---
 
@@ -407,6 +440,7 @@ curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/user/usr_
 | S10 | Rate limiting: 61 запрос за минуту одним ключом (можно по разным ручкам) | 61-й → 429 Too Many Requests |
 | S11 | Ключ отключённого (`disabled`) партнёра | 401 (отозван) / 403 (партнёр disabled) |
 | S12 | Ключ с `partner:read`, но `partner_id: null` → любая `/api/v1/partner/*` ручка | 403 |
+| S13 | Тот же ключ → `GET /api/v1/yield/history/USDC` | 200 (протокольные данные, партнёр не нужен) |
 
 ### Rate limiting
 

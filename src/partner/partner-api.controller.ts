@@ -12,6 +12,7 @@ import { PartnerService } from './partner.service';
 import { AttributionService } from './attribution.service';
 import { RevenueService } from './revenue.service';
 import { StoreService } from '../store/store.service';
+import { YieldService } from '../yield/yield.service';
 import { PartnerSummaryOutputDto, RevenueShareOutputDto } from './dto';
 
 @ApiTags('Partner API (Self-Service)')
@@ -24,6 +25,7 @@ export class PartnerApiController {
     private readonly attribution: AttributionService,
     private readonly revenue: RevenueService,
     private readonly store: StoreService,
+    private readonly yieldService: YieldService,
   ) {}
 
   private requirePartnerId(partnerId: string | null): string {
@@ -101,51 +103,20 @@ export class PartnerApiController {
   @Get('yield/history/:asset')
   @ApiParam({ name: 'asset', enum: ['USDC', 'USDT'] })
   @ApiOperation({
-    summary: 'Yield history for asset',
+    summary: 'Yield history for asset (deprecated)',
+    deprecated: true,
     description:
-      'Protocol-wide blended APY history for the asset across active Thesauros vaults — ' +
-      'the series is identical for every partner and contains no partner-specific data. ' +
-      'Requires a partner-scoped key, like the rest of the self-service API.',
+      'Deprecated — use `GET /api/v1/yield/history/:asset` instead. The series is protocol-wide ' +
+      'blended APY, identical for every partner, so it does not belong under the partner-scoped ' +
+      'namespace. This alias returns an identical payload but still requires a partner-scoped key, ' +
+      'because every route under /partner/* does.',
   })
   async getYieldHistory(
     @PartnerId() partnerId: string | null,
     @Param('asset') asset: string,
   ): Promise<unknown> {
     this.requirePartnerId(partnerId);
-    const vaults = await this.store.filter<any>('vaults', (v) => v.asset === asset.toUpperCase() && v.status === 'active');
-    if (vaults.length === 0) throw new NotFoundException(`Unsupported asset "${asset}".`);
-    const totalAlloc = vaults.reduce((s: number, v: any) => s + ((v.allocation_pct as number) || 0), 0);
-    const blendApy = totalAlloc > 0
-      ? vaults.reduce((s: number, v: any) => s + (v.apy as number) * ((v.allocation_pct as number) || 0), 0) / totalAlloc
-      : vaults.reduce((s: number, v: any) => s + (v.apy as number), 0) / vaults.length;
-    const dayMs = 24 * 60 * 60 * 1000;
-    const now = Date.now();
-    const history = Array.from({ length: 30 }, (_, i) => {
-      const seed = `yieldhist:${asset.toUpperCase()}:${i}`;
-      let h = 1779033703 ^ seed.length;
-      for (let j = 0; j < seed.length; j++) {
-        h = Math.imul(h ^ seed.charCodeAt(j), 3432918353);
-        h = (h << 13) | (h >>> 19);
-      }
-      h = Math.imul(h ^ (h >>> 16), 2246822507);
-      h = Math.imul(h ^ (h >>> 13), 3266489909);
-      const u32 = (h ^= h >>> 16) >>> 0;
-      let a = u32;
-      a |= 0; a = (a + 0x6d2b79f5) | 0;
-      let t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      const rng = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-      const drift = (rng - 0.5) * 0.01;
-      return { t: now - (29 - i) * dayMs, apy: Math.round(Math.max(0, blendApy + drift) * 10000) / 10000 };
-    });
-    return {
-      object: 'yield_history',
-      // Explicit so callers never mistake this for partner-attributed yield.
-      scope: 'protocol',
-      asset: asset.toUpperCase(),
-      blend_apy: Math.round(blendApy * 10000) / 10000,
-      history,
-    };
+    return this.yieldService.getAssetHistory(asset);
   }
 
   @Get('points')

@@ -30,8 +30,13 @@ export class RevenueShareOutputDto {
   @ApiProperty({ example: 85420.5 })
   tvl: number;
 
-  @ApiProperty({ example: 0.0565 })
-  blend_apy: number;
+  @ApiProperty({
+    example: 0.0565,
+    description:
+      'Protocol-wide allocation-weighted APY across all active Thesauros vaults. ' +
+      'Identical for every partner — only `tvl` and `revenue_share_pct` are partner-specific.',
+  })
+  protocol_blend_apy: number;
 
   @ApiProperty({ type: RevenueTimescaleDto })
   annual: RevenueTimescaleDto;

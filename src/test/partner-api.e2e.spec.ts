@@ -166,7 +166,7 @@ describe('Partner API (e2e)', () => {
   });
 
   describe('partner-scoped access', () => {
-    it('rejects yield history for a key with no partner binding', async () => {
+    it('rejects the deprecated /partner alias for a key with no partner binding', async () => {
       const created = await call('POST', '/api/v1/keys', MASTER, {
         label: 'Unbound partner:read key',
         scopes: ['partner:read'],
@@ -180,6 +180,65 @@ describe('Partner API (e2e)', () => {
     it('marks yield history as protocol-wide, not partner data', async () => {
       const res = await get('/api/v1/partner/yield/history/USDC', ACME);
       expect(res.body.data.scope).toBe('protocol');
+    });
+  });
+
+  describe('GET /api/v1/yield/history/:asset (protocol namespace)', () => {
+    it('is enveloped and marked protocol-scoped', async () => {
+      const res = await get('/api/v1/yield/history/USDC', ACME);
+      expect(res.status).toBe(200);
+      expectEnvelope(res.body, 'yield_history');
+      expect(res.body.data.scope).toBe('protocol');
+      expect(res.body.data.asset).toBe('USDC');
+      expect(res.body.data.blend_apy).toBeGreaterThan(0);
+      expect(res.body.data.history).toHaveLength(30);
+    });
+
+    it('returns byte-identical series to every caller, partner-bound or not', async () => {
+      const acme = await get('/api/v1/yield/history/USDC', ACME);
+      const admin = await get('/api/v1/yield/history/USDC', MASTER);
+      expect(admin.status).toBe(200);
+      expect(admin.body.data.blend_apy).toBe(acme.body.data.blend_apy);
+      expect(admin.body.data.history.map((p: any) => p.apy)).toEqual(
+        acme.body.data.history.map((p: any) => p.apy),
+      );
+    });
+
+    it('accepts an admin key with partner_id: null — no partner binding needed', async () => {
+      const created = await call('POST', '/api/v1/keys', MASTER, {
+        label: 'Unbound key for protocol yield',
+        scopes: ['partner:read'],
+      });
+      const res = await get('/api/v1/yield/history/USDC', created.body.data.secret);
+      expect(res.status).toBe(200);
+      expect(res.body.data.scope).toBe('protocol');
+    });
+
+    it('matches the deprecated alias payload field for field', async () => {
+      const fresh = await get('/api/v1/yield/history/USDT', ACME);
+      const alias = await get('/api/v1/partner/yield/history/USDT', ACME);
+      expect(Object.keys(alias.body.data).sort()).toEqual(Object.keys(fresh.body.data).sort());
+      expect(alias.body.data.blend_apy).toBe(fresh.body.data.blend_apy);
+    });
+
+    it('rejects an unsupported asset', async () => {
+      const res = await get('/api/v1/yield/history/ETH', ACME);
+      expect(res.status).toBe(404);
+      expect(res.body.error.message).toMatch(/unsupported asset/i);
+    });
+  });
+
+  describe('GET /api/v1/partner/revenue', () => {
+    it('names the protocol-wide rate explicitly and returns it equal for all partners', async () => {
+      const acme = await get('/api/v1/partner/revenue', ACME);
+      expect(acme.body.data).toHaveProperty('protocol_blend_apy');
+      expect(acme.body.data).not.toHaveProperty('blend_apy');
+
+      const created = await call('POST', '/api/v1/partners', MASTER, { name: 'Revenue Compare Co' });
+      const other = await get('/api/v1/partner/revenue', created.body.data.api_key.secret);
+      expect(other.body.data.protocol_blend_apy).toBe(acme.body.data.protocol_blend_apy);
+      // ...while the partner-specific side genuinely differs.
+      expect(other.body.data.tvl).not.toBe(acme.body.data.tvl);
     });
   });
 

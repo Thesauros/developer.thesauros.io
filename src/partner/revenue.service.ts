@@ -19,7 +19,7 @@ interface RevenueShareResult {
   revenue_share_pct: number;
   protocol_fee_rate: number;
   tvl: number;
-  blend_apy: number;
+  protocol_blend_apy: number;
   annual: { yield: number; protocol_fees: number; partner_revenue: number };
   daily: { yield: number; protocol_fees: number; partner_revenue: number };
   as_of: string;
@@ -52,7 +52,7 @@ export class RevenueService {
       revenue_share_pct: sharePct,
       protocol_fee_rate: PROTOCOL_FEE_RATE,
       tvl,
-      blend_apy: blendApy,
+      protocol_blend_apy: blendApy,
       annual: { yield: annualYield, protocol_fees: annualProtocolFees, partner_revenue: annualPartnerRevenue },
       daily: { yield: dailyYield, protocol_fees: dailyProtocolFees, partner_revenue: dailyPartnerRevenue },
       as_of: new Date().toISOString(),

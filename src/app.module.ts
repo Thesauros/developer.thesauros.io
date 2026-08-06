@@ -8,6 +8,7 @@ import { StoreModule } from './store/store.module';
 import { CryptoModule } from './crypto/crypto.module';
 import { AuthModule } from './auth/auth.module';
 import { PartnerModule } from './partner/partner.module';
+import { YieldModule } from './yield/yield.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { PartnerModule } from './partner/partner.module';
     CryptoModule,
     AuthModule,
     PartnerModule,
+    YieldModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ApiThrottlerGuard },
