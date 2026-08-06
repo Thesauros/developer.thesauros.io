@@ -100,8 +100,18 @@ export class PartnerApiController {
 
   @Get('yield/history/:asset')
   @ApiParam({ name: 'asset', enum: ['USDC', 'USDT'] })
-  @ApiOperation({ summary: 'Yield history for asset' })
-  async getYieldHistory(@Param('asset') asset: string): Promise<unknown> {
+  @ApiOperation({
+    summary: 'Yield history for asset',
+    description:
+      'Protocol-wide blended APY history for the asset across active Thesauros vaults — ' +
+      'the series is identical for every partner and contains no partner-specific data. ' +
+      'Requires a partner-scoped key, like the rest of the self-service API.',
+  })
+  async getYieldHistory(
+    @PartnerId() partnerId: string | null,
+    @Param('asset') asset: string,
+  ): Promise<unknown> {
+    this.requirePartnerId(partnerId);
     const vaults = await this.store.filter<any>('vaults', (v) => v.asset === asset.toUpperCase() && v.status === 'active');
     if (vaults.length === 0) throw new NotFoundException(`Unsupported asset "${asset}".`);
     const totalAlloc = vaults.reduce((s: number, v: any) => s + ((v.allocation_pct as number) || 0), 0);
@@ -128,7 +138,14 @@ export class PartnerApiController {
       const drift = (rng - 0.5) * 0.01;
       return { t: now - (29 - i) * dayMs, apy: Math.round(Math.max(0, blendApy + drift) * 10000) / 10000 };
     });
-    return { object: 'yield_history', asset: asset.toUpperCase(), blend_apy: Math.round(blendApy * 10000) / 10000, history };
+    return {
+      object: 'yield_history',
+      // Explicit so callers never mistake this for partner-attributed yield.
+      scope: 'protocol',
+      asset: asset.toUpperCase(),
+      blend_apy: Math.round(blendApy * 10000) / 10000,
+      history,
+    };
   }
 
   @Get('points')

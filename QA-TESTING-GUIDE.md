@@ -40,12 +40,23 @@
 
 ### Формат ответов
 
-Все ответы обёрнуты в JSON-конверт:
+Все успешные ответы обёрнуты в JSON-конверт — на верхнем уровне ровно два поля, `object` и `data`:
 ```json
 {
-  "object": "...",
-  "data": { ... }
+  "object": "partner",
+  "data": {
+    "id": "ptn_seed_acme",
+    "object": "partner",
+    "name": "Acme Wallet"
+  }
 }
+```
+
+- `object` конверта повторяет тип ресурса внутри `data` (`partner`, `campaign`, `api_key`, `partner_summary`, `partner_tvl`, `revenue_share`, `yield_history`, …).
+- Для коллекций `object` = `"list"`, а `data` — массив:
+
+```json
+{ "object": "list", "data": [ { "id": "ptn_seed_acme", "object": "partner" } ] }
 ```
 
 Ошибки возвращаются в формате:
@@ -140,7 +151,11 @@ curl -X POST https://partner-api-production-10ad.up.railway.app/api/v1/keys \
 ```
 
 **Тест-кейсы:**
-- [ ] Успешное создание ключа — ответ содержит `secret` (показывается один раз)
+- [ ] Ответ — конверт `{ "object": "api_key", "data": { ... } }`
+- [ ] Успешное создание ключа — `data.secret` содержит полный секрет (показывается один раз)
+- [ ] `data` **НЕ** содержит `secret_hash` и `_plaintext_secret`
+- [ ] `partner_id` несуществующего партнёра → **400**
+- [ ] `partner_id` отключённого (`disabled`) партнёра → **400**
 - [ ] Попытка создать ключ с `scopes: ["*"]` — **400 Bad Request** (wildcard запрещён)
 - [ ] Попытка создать ключ с `scopes: ["keys:admin"]` — **400 Bad Request** (запрещён)
 - [ ] `environment` всегда `test` — даже если передать `"environment": "live"` → **400**
@@ -167,9 +182,9 @@ curl -X DELETE https://partner-api-production-10ad.up.railway.app/api/v1/keys/KE
 ```
 
 **Тест-кейсы:**
-- [ ] Успешный отзыв → `{ "id": "...", "revoked": true }`
+- [ ] Успешный отзыв → `{ "object": "api_key", "data": { "id": "...", "revoked": true } }`
 - [ ] Повторный запрос с отозванным ключом → **401**
-- [ ] Несуществующий ID → `{ "id": "...", "revoked": false }`
+- [ ] Несуществующий ID → `data` = `{ "id": "...", "revoked": false }`
 
 ---
 
@@ -188,7 +203,7 @@ curl -X POST https://partner-api-production-10ad.up.railway.app/api/v1/partners 
 
 **Тест-кейсы:**
 - [ ] Создаёт партнёра и автоматически генерирует API-ключ для него
-- [ ] Ответ содержит `partner` и `api_key` с `secret`
+- [ ] `data` содержит `partner` и `api_key` с `secret`
 - [ ] Без обязательных полей → **400**
 - [ ] С ключом без `partner:admin` → **403**
 
@@ -226,10 +241,19 @@ curl -X PATCH https://partner-api-production-10ad.up.railway.app/api/v1/partners
 
 **Зачем `status`:** hard-delete партнёра/кампании через API нет намеренно — attribution, позиции и revenue-история должны сохраняться. Soft-disable (`active` → `disabled`) выключает партнёра/кампанию без потери данных. Вернуть можно тем же PATCH с `"status": "active"`.
 
+**Что происходит при `status: "disabled"`:**
+1. Все активные API-ключи партнёра немедленно отзываются (`revoked: true`) — партнёр теряет доступ ко всем ручкам.
+2. Ключ, привязанный к отключённому партнёру, отклоняется на этапе аутентификации даже если его не успели отозвать.
+3. Выдать новый ключ отключённому партнёру нельзя (**400**).
+4. Возврат в `active` **не** восстанавливает отозванные ключи — их нужно выпустить заново через `POST /api/v1/keys`.
+
 **Тест-кейсы:**
+- [ ] Ответ — конверт `{ "object": "partner", "data": { ... } }` с тем же набором полей, что и `GET /partners/:id` (включая `status`)
 - [ ] Обновление `revenue_share_pct` → значение изменилось
 - [ ] `{"status":"disabled"}` → партнёр disabled, виден в `GET /partners?status=disabled`
-- [ ] `{"status":"active"}` → снова active
+- [ ] После disable: `GET /api/v1/keys` → ключи партнёра с `revoked: true`
+- [ ] После disable: запрос к `/api/v1/partner/*` ключом этого партнёра → **401** (ключ отозван)
+- [ ] `{"status":"active"}` → снова active (ключи остаются отозванными — выпустить новый)
 - [ ] `{"status":"deleted"}` → **400**
 - [ ] `updated_at` обновился
 - [ ] Несуществующий ID → **404**
@@ -331,10 +355,13 @@ curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/yield/his
   -H "Authorization: Bearer tsk_test_acme_partner_key_00000000000000000"
 ```
 
+**Важно:** ручка возвращает **протокольный** blended APY по активу (по всем активным ваултам Thesauros), а не данные конкретного партнёра — серия одинакова для всех партнёров. Это явно помечено полем `data.scope: "protocol"`. Тем не менее ключ должен быть привязан к партнёру, как и на остальных self-service ручках.
+
 **Тест-кейсы:**
-- [ ] `USDC` → массив `history` из 30 точек, `blend_apy` > 0
+- [ ] `USDC` → массив `history` из 30 точек, `blend_apy` > 0, `scope: "protocol"`
 - [ ] `USDT` → аналогично
 - [ ] `ETH` → **404** "Unsupported asset"
+- [ ] Ключ со скоупом `partner:read`, но с `partner_id: null` → **403** "requires a partner-scoped API key"
 
 #### `GET /api/v1/partner/points` — Начисленные поинты
 
@@ -376,14 +403,32 @@ curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/user/usr_
 | S6 | Acme-ключ → `GET /api/v1/partner/user/usr_seed_quill/positions` | 403 (чужой пользователь) |
 | S7 | Создание ключа с `scopes: ["*"]` | 400 |
 | S8 | Создание ключа с `environment: "live"` | 400 |
-| S9 | `GET /api/v1/keys` → проверить что `secret_hash` отсутствует в ответе | Отсутствует |
-| S10 | Rate limiting: 60+ запросов за минуту | 429 Too Many Requests |
+| S9 | `GET /api/v1/keys` и `POST /api/v1/keys` → проверить что `secret_hash` и `_plaintext_secret` отсутствуют в ответе | Отсутствуют |
+| S10 | Rate limiting: 61 запрос за минуту одним ключом (можно по разным ручкам) | 61-й → 429 Too Many Requests |
+| S11 | Ключ отключённого (`disabled`) партнёра | 401 (отозван) / 403 (партнёр disabled) |
+| S12 | Ключ с `partner:read`, но `partner_id: null` → любая `/api/v1/partner/*` ручка | 403 |
+
+### Rate limiting
+
+Лимит — **60 запросов в минуту на API-ключ, суммарно по всем ручкам** (без ключа — на IP). Раньше бюджет считался по каждому эндпоинту отдельно, поэтому 429 наступал только после ~200 запросов; теперь бюджет общий.
+
+Каждый ответ содержит заголовки: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`; при 429 добавляется `Retry-After`.
+
+```bash
+for i in $(seq 1 61); do
+  curl -s -o /dev/null -w "%{http_code}\n" \
+    https://partner-api-production-10ad.up.railway.app/api/v1/partner/summary \
+    -H "Authorization: Bearer tsk_test_acme_partner_key_00000000000000000"
+done | sort | uniq -c
+# ожидается: 60x 200, 1x 429
+```
 
 ---
 
 ## 5. Проверки формата ответов
 
-- [ ] Все успешные ответы обёрнуты в `{ "object": "...", "data": ... }`
+- [ ] Все успешные ответы обёрнуты в `{ "object": "...", "data": ... }` — на верхнем уровне ровно два поля
+- [ ] `object` конверта совпадает с `data.object` для одиночных ресурсов, `"list"` — для массивов
 - [ ] Все ошибки содержат `{ "error": { "code": "...", "message": "..." } }`
 - [ ] HTTP-коды: 200 (ok), 201 (created), 400 (validation), 401 (no/bad auth), 403 (forbidden), 404 (not found), 429 (rate limit)
 

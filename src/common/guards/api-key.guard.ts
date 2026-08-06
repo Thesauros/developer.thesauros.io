@@ -33,6 +33,9 @@ export class ApiKeyGuard implements CanActivate {
     const secret = match[1].trim();
     const result = await this.authService.authenticate(secret);
     if ('error' in result) {
+      if (result.reason === 'forbidden') {
+        throw new ForbiddenException(result.error);
+      }
       throw new UnauthorizedException(result.error);
     }
     const requiredScope = this.reflector.getAllAndOverride<string>(REQUIRED_SCOPE_KEY, [

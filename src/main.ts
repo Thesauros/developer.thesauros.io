@@ -1,35 +1,14 @@
 import 'reflect-metadata';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor';
+import { configureApp } from './bootstrap';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const nodeEnv = process.env.NODE_ENV ?? 'development';
-  const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
-    : ['http://localhost:3000'];
-  app.enableCors({
-    origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type'],
-    credentials: true,
-  });
-  app.use(helmet());
-  app.setGlobalPrefix('api/v1');
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-  app.useGlobalFilters(new AllExceptionsFilter());
-  app.useGlobalInterceptors(new ResponseEnvelopeInterceptor());
+  configureApp(app);
   if (nodeEnv !== 'production') {
     const swagger = new DocumentBuilder()
       .setTitle('Thesauros Partner API')
