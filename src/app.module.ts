@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { ApiThrottlerGuard } from './common/guards/api-throttler.guard';
 import { DatabaseModule } from './database/database.module';
 import { StoreModule } from './store/store.module';
 import { CryptoModule } from './crypto/crypto.module';
 import { AuthModule } from './auth/auth.module';
 import { PartnerModule } from './partner/partner.module';
+import { YieldModule } from './yield/yield.module';
 
 @Module({
   imports: [
@@ -20,9 +22,10 @@ import { PartnerModule } from './partner/partner.module';
     CryptoModule,
     AuthModule,
     PartnerModule,
+    YieldModule,
   ],
   providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: ApiThrottlerGuard },
   ],
 })
 export class AppModule {}

@@ -1,54 +1,66 @@
 # Thesauros Partner API v1 — QA Testing Guide
 
-**Partner API** — бэкенд-сервис для работы с партнёрской программой. Партнёры (кошельки, финтех-приложения, агрегаторы) интегрируют Thesauros через API и получают revenue share с доходности привлечённых пользователей.
+**Partner API** is the backend service behind the partner programme. Partners (wallets, fintech apps, aggregators) integrate Thesauros through the API and earn a revenue share on the yield of the users they bring in.
 
-### Что делает этот сервис
+### What this service does
 
-1. **Partner Attribution** — отслеживание, какой партнёр привёл какого пользователя, через какую кампанию и с какого источника (UTM-метки, реферальные ссылки, виджеты).
+1. **Partner Attribution** — tracks which partner brought which user, through which campaign and from which source (UTM tags, referral links, widgets).
 
-2. **Partner Dashboard API** — self-service API для партнёров: сводка по привлечённым пользователям, депозитам, TVL, начисленному yield, поинтам и revenue share. Партнёр видит только своих пользователей.
+2. **Partner Dashboard API** — self-service API for partners: a summary of attributed users, deposits, TVL, accrued yield, points and revenue share. A partner only ever sees their own users.
 
-3. **Admin API** — внутренний API для управления партнёрами, кампаниями и API-ключами. Используется командой Thesauros.
+3. **Admin API** — internal API for managing partners, campaigns and API keys. Used by the Thesauros team.
 
-4. **Аутентификация и авторизация** — Bearer API-ключи с системой скоупов. Каждый ключ привязан к набору прав и (опционально) к конкретному партнёру. Rate limiting 60 запросов/минуту.
+4. **Authentication and authorisation** — Bearer API keys with a scope system. Every key carries a set of permissions and, optionally, a binding to a specific partner. Rate limit: 60 requests per minute.
 
-### Модули
+### Modules
 
-| Модуль | Назначение |
+| Module | Purpose |
 |---|---|
-| **AuthModule** | Генерация, валидация и отзыв API-ключей. Хэширование секретов (SHA-256), шифрование (AES-256-GCM). |
-| **PartnerModule** | CRUD партнёров и кампаний. Attribution-логика (привязка user → partner → campaign). Расчёт revenue share. |
-| **StoreModule** | Абстракция над базой данных. Seed тестовых данных при первом запуске. |
-| **CryptoModule** | Шифрование/дешифрование секретов API-ключей (AES-256-GCM). |
-| **DatabaseModule** | Подключение к PostgreSQL через TypeORM. |
+| **AuthModule** | Issuing, validating and revoking API keys. Secret hashing (SHA-256) and encryption (AES-256-GCM). |
+| **PartnerModule** | CRUD for partners and campaigns. Attribution logic (user → partner → campaign). Revenue share calculation. |
+| **StoreModule** | Database abstraction. Seeds test data on first start. |
+| **CryptoModule** | Encryption/decryption of API key secrets (AES-256-GCM). |
+| **DatabaseModule** | PostgreSQL connection via TypeORM. |
 
-### Описание эндпоинтов
+### Endpoint groups
 
-| Группа | Префикс | Для кого | Что делает |
+| Group | Prefix | Audience | What it does |
 |---|---|---|---|
-| **Keys** | `/api/v1/keys` | Админы Thesauros | Создание, просмотр и отзыв API-ключей |
-| **Partners (Admin)** | `/api/v1/partners` | Админы Thesauros | Создание и управление партнёрами, создание кампаний |
-| **Partner (Self-Service)** | `/api/v1/partner` | Партнёры | Просмотр своей статистики: пользователи, депозиты, TVL, yield, revenue share, позиции пользователей |
+| **Keys** | `/api/v1/keys` | Thesauros admins | Create, list and revoke API keys |
+| **Partners (Admin)** | `/api/v1/partners` | Thesauros admins | Create and manage partners, create campaigns |
+| **Partner (Self-Service)** | `/api/v1/partner` | Partners | View **your own** statistics: users, deposits, TVL, yield, revenue share, user positions. Every route requires a partner-bound key |
+| **Yield (Protocol)** | `/api/v1/yield` | Everyone | Protocol-level yield metrics, identical for every caller. No partner binding required |
 
 ---
 
-## Стенд
+## Environment
 
 **Base URL:** `https://partner-api-production-10ad.up.railway.app`
 **Swagger UI:** `https://partner-api-production-10ad.up.railway.app/swagger`
 **Swagger JSON:** `https://partner-api-production-10ad.up.railway.app/swagger-json`
 
-### Формат ответов
+### Response format
 
-Все ответы обёрнуты в JSON-конверт:
+Every successful response is wrapped in a JSON envelope — exactly two top-level fields, `object` and `data`:
 ```json
 {
-  "object": "...",
-  "data": { ... }
+  "object": "partner",
+  "data": {
+    "id": "ptn_seed_acme",
+    "object": "partner",
+    "name": "Acme Wallet"
+  }
 }
 ```
 
-Ошибки возвращаются в формате:
+- The envelope's `object` mirrors the resource type inside `data` (`partner`, `campaign`, `api_key`, `partner_summary`, `partner_tvl`, `revenue_share`, `yield_history`, …).
+- For collections `object` is `"list"` and `data` is an array:
+
+```json
+{ "object": "list", "data": [ { "id": "ptn_seed_acme", "object": "partner" } ] }
+```
+
+Errors come back in this shape:
 ```json
 {
   "error": {
@@ -60,60 +72,60 @@
 
 ---
 
-## 1. Аутентификация
+## 1. Authentication
 
-Все запросы требуют заголовок `Authorization: Bearer <API_KEY>`.
+Every request requires the `Authorization: Bearer <API_KEY>` header.
 
-### Предустановленные тестовые ключи
+### Preconfigured test keys
 
-| Ключ | Скоупы | Партнёр | Описание |
+| Key | Scopes | Partner | Description |
 |---|---|---|---|
-| `tsk_test_master_full_access_000000000000000` | `read`, `write`, `keys:admin`, `partner:admin`, `partner:read` | — | **Master-ключ с полным доступом (для QA)** |
-| `tsk_test_thesauros_sandbox_0000000000000000` | `read`, `write` | — | Bootstrap-ключ (без админ-прав) |
-| `tsk_test_acme_partner_key_00000000000000000` | `partner:read` | Acme Wallet (`ptn_seed_acme`) | Партнёрский ключ Acme |
-| `tsk_test_orbit_partner_key_0000000000000000` | `partner:read` | Orbit Finance (`ptn_seed_orbit`) | Партнёрский ключ Orbit |
+| `tsk_test_master_full_access_000000000000000` | `read`, `write`, `keys:admin`, `partner:admin`, `partner:read` | — | **Master key with full access (for QA)** |
+| `tsk_test_thesauros_sandbox_0000000000000000` | `read`, `write` | — | Bootstrap key (no admin rights) |
+| `tsk_test_acme_partner_key_00000000000000000` | `partner:read` | Acme Wallet (`ptn_seed_acme`) | Acme partner key |
+| `tsk_test_orbit_partner_key_0000000000000000` | `partner:read` | Orbit Finance (`ptn_seed_orbit`) | Orbit partner key |
 
-### Скоупы
+### Scopes
 
-| Скоуп | Доступ |
+| Scope | Grants |
 |---|---|
-| `read` | Чтение общих данных |
-| `write` | Запись общих данных |
-| `partner:read` | Чтение партнёрских данных (self-service) |
-| `partner:admin` | Управление партнёрами (админ) |
-| `keys:admin` | Управление API-ключами |
+| `read` | Read general data |
+| `write` | Write general data |
+| `partner:read` | Read partner data (self-service) |
+| `partner:admin` | Manage partners (admin) |
+| `keys:admin` | Manage API keys |
 
 ---
 
-## 2. Тестовые данные (Seed Data)
+## 2. Seed data
 
-### Партнёры
+### Partners
 
-| ID | Имя | Revenue Share | Статус |
+| ID | Name | Revenue share | Status |
 |---|---|---|---|
 | `ptn_seed_acme` | Acme Wallet | 15% | active |
 | `ptn_seed_orbit` | Orbit Finance | 20% | active |
 
-### Кампании
+### Campaigns
 
-| ID | Партнёр | Имя | UTM Source |
+| ID | Partner | Name | UTM source |
 |---|---|---|---|
 | `cmp_seed_acme_launch` | Acme | Acme Summer Launch | twitter |
 | `cmp_seed_acme_earn` | Acme | Acme Earn Widget | widget |
 | `cmp_seed_orbit_q3` | Orbit | Orbit Q3 Promo | newsletter |
 | `cmp_seed_orbit_app` | Orbit | Orbit In-App | app |
 
-### Пользователи
+### Users
 
-| ID | Имя | Привязан к партнёру |
+| ID | Name | Attributed to |
 |---|---|---|
-| `usr_seed_nova` | Nova Treasury | Acme (через `cmp_seed_acme_launch`) |
-| `usr_seed_orbit` | Orbit Payments | Acme (через `cmp_seed_acme_earn`) |
-| `usr_seed_quill` | Quill Holdings | Orbit (через `cmp_seed_orbit_q3`) |
+| `usr_seed_nova` | Nova Treasury | Acme (via `cmp_seed_acme_launch`) |
+| `usr_seed_orbit` | Orbit Payments | Acme (via `cmp_seed_acme_earn`) |
+| `usr_seed_quill` | Quill Holdings | Orbit (via `cmp_seed_orbit_q3`) |
 
-### Позиции
+### Positions
 
-| ID | Пользователь | Актив | Principal | Статус | Партнёр |
+| ID | User | Asset | Principal | Status | Partner |
 |---|---|---|---|---|---|
 | `pos_seed_alpha` | Nova | USDC | $25,000 | active | Acme |
 | `pos_seed_beta` | Orbit | USDT | $10,000 | active | Acme |
@@ -122,100 +134,104 @@
 
 ---
 
-## 3. Эндпоинты и тест-кейсы
+## 3. Endpoints and test cases
 
-### 3.1 Keys Management (`/api/v1/keys`)
+### 3.1 Keys management (`/api/v1/keys`)
 
-Требуемый скоуп: `keys:admin`
+Required scope: `keys:admin`
 
-> Примечание: bootstrap-ключ имеет скоупы `read`, `write` — у него **нет** `keys:admin`. Для тестирования этих эндпоинтов нужно сначала создать ключ с `keys:admin` скоупом через Swagger или напрямую в БД.
+> Note: the bootstrap key holds `read` and `write` — it does **not** have `keys:admin`. To test these endpoints, first create a key with the `keys:admin` scope through Swagger or directly in the database.
 
-#### `POST /api/v1/keys` — Создать API-ключ
+#### `POST /api/v1/keys` — Create an API key
 
 ```bash
 curl -X POST https://partner-api-production-10ad.up.railway.app/api/v1/keys \
-  -H "Authorization: Bearer <КЛЮЧ_С_keys:admin>" \
+  -H "Authorization: Bearer <KEY_WITH_keys:admin>" \
   -H "Content-Type: application/json" \
   -d '{"label": "Test Key", "scopes": ["read", "write"]}'
 ```
 
-**Тест-кейсы:**
-- [ ] Успешное создание ключа — ответ содержит `secret` (показывается один раз)
-- [ ] Попытка создать ключ с `scopes: ["*"]` — **400 Bad Request** (wildcard запрещён)
-- [ ] Попытка создать ключ с `scopes: ["keys:admin"]` — **400 Bad Request** (запрещён)
-- [ ] `environment` всегда `test` — даже если передать `"environment": "live"` → **400**
-- [ ] Без `Authorization` заголовка → **401 Unauthorized**
-- [ ] С ключом без `keys:admin` скоупа → **403 Forbidden**
+**Test cases:**
+- [ ] Response is the envelope `{ "object": "api_key", "data": { ... } }`
+- [ ] On success `data.secret` holds the full secret (shown exactly once)
+- [ ] `data` does **NOT** contain `secret_hash` or `_plaintext_secret`
+- [ ] `partner_id` of a non-existent partner → **400**
+- [ ] `partner_id` of a `disabled` partner → **400**
+- [ ] Creating a key with `scopes: ["*"]` → **400 Bad Request** (wildcards are rejected)
+- [ ] Creating a key with `scopes: ["keys:admin"]` → **400 Bad Request** (not assignable)
+- [ ] `environment` is always `test` — passing `"environment": "live"` → **400**
+- [ ] No `Authorization` header → **401 Unauthorized**
+- [ ] Key without the `keys:admin` scope → **403 Forbidden**
 
-#### `GET /api/v1/keys` — Список ключей
+#### `GET /api/v1/keys` — List keys
 
 ```bash
 curl https://partner-api-production-10ad.up.railway.app/api/v1/keys \
-  -H "Authorization: Bearer <КЛЮЧ_С_keys:admin>"
+  -H "Authorization: Bearer <KEY_WITH_keys:admin>"
 ```
 
-**Тест-кейсы:**
-- [ ] Возвращает массив ключей
-- [ ] `secret` замаскирован (не содержит полный секрет)
-- [ ] `secret_hash` **НЕ** присутствует в ответе
+**Test cases:**
+- [ ] Returns an array of keys
+- [ ] `secret` is masked (never the full secret)
+- [ ] `secret_hash` is **NOT** present in the response
 
-#### `DELETE /api/v1/keys/:id` — Отозвать ключ
+#### `DELETE /api/v1/keys/:id` — Revoke a key
 
 ```bash
 curl -X DELETE https://partner-api-production-10ad.up.railway.app/api/v1/keys/KEY_ID \
-  -H "Authorization: Bearer <КЛЮЧ_С_keys:admin>"
+  -H "Authorization: Bearer <KEY_WITH_keys:admin>"
 ```
 
-**Тест-кейсы:**
-- [ ] Успешный отзыв → `{ "id": "...", "revoked": true }`
-- [ ] Повторный запрос с отозванным ключом → **401**
-- [ ] Несуществующий ID → `{ "id": "...", "revoked": false }`
+**Test cases:**
+- [ ] Successful revoke → `{ "object": "api_key", "data": { "id": "...", "revoked": true } }`
+- [ ] Reusing the revoked key → **401**
+- [ ] Unknown ID → `data` is `{ "id": "...", "revoked": false }`
 
 ---
 
-### 3.2 Partners Admin (`/api/v1/partners`)
+### 3.2 Partners admin (`/api/v1/partners`)
 
-Требуемый скоуп: `partner:admin`
+Required scope: `partner:admin`
 
-#### `POST /api/v1/partners` — Создать партнёра
+#### `POST /api/v1/partners` — Create a partner
 
 ```bash
 curl -X POST https://partner-api-production-10ad.up.railway.app/api/v1/partners \
-  -H "Authorization: Bearer <КЛЮЧ_С_partner:admin>" \
+  -H "Authorization: Bearer <KEY_WITH_partner:admin>" \
   -H "Content-Type: application/json" \
   -d '{"name": "New Partner", "slug": "new-partner", "contact_email": "test@example.com", "revenue_share_pct": 0.10}'
 ```
 
-**Тест-кейсы:**
-- [ ] Создаёт партнёра и автоматически генерирует API-ключ для него
-- [ ] Ответ содержит `partner` и `api_key` с `secret`
-- [ ] Без обязательных полей → **400**
-- [ ] С ключом без `partner:admin` → **403**
+**Test cases:**
+- [ ] Creates the partner and automatically issues an API key for it
+- [ ] `data` contains `partner` and `api_key` with a `secret`
+- [ ] Missing required fields → **400**
+- [ ] Key without `partner:admin` → **403**
 
-#### `GET /api/v1/partners` — Список партнёров
+#### `GET /api/v1/partners` — List partners
 
 ```bash
 curl https://partner-api-production-10ad.up.railway.app/api/v1/partners \
-  -H "Authorization: Bearer <КЛЮЧ_С_partner:admin>"
+  -H "Authorization: Bearer <KEY_WITH_partner:admin>"
 ```
 
-**Тест-кейсы:**
-- [ ] Возвращает всех партнёров
-- [ ] Фильтр `?status=active` — только активные
-- [ ] Фильтр `?status=disabled` — только отключённые
+**Test cases:**
+- [ ] Returns every partner
+- [ ] `?status=active` filter — active partners only
+- [ ] `?status=disabled` filter — disabled partners only
 
-#### `GET /api/v1/partners/:id` — Партнёр по ID
+#### `GET /api/v1/partners/:id` — Partner by ID
 
 ```bash
 curl https://partner-api-production-10ad.up.railway.app/api/v1/partners/ptn_seed_acme \
-  -H "Authorization: Bearer <КЛЮЧ_С_partner:admin>"
+  -H "Authorization: Bearer <KEY_WITH_partner:admin>"
 ```
 
-**Тест-кейсы:**
-- [ ] `ptn_seed_acme` → данные Acme Wallet
-- [ ] Несуществующий ID → **404**
+**Test cases:**
+- [ ] `ptn_seed_acme` → Acme Wallet data
+- [ ] Unknown ID → **404**
 
-#### `PATCH /api/v1/partners/:id` — Обновить партнёра
+#### `PATCH /api/v1/partners/:id` — Update a partner
 
 ```bash
 curl -X PATCH https://partner-api-production-10ad.up.railway.app/api/v1/partners/ptn_seed_acme \
@@ -224,17 +240,26 @@ curl -X PATCH https://partner-api-production-10ad.up.railway.app/api/v1/partners
   -d '{"status": "disabled"}'
 ```
 
-**Зачем `status`:** hard-delete партнёра/кампании через API нет намеренно — attribution, позиции и revenue-история должны сохраняться. Soft-disable (`active` → `disabled`) выключает партнёра/кампанию без потери данных. Вернуть можно тем же PATCH с `"status": "active"`.
+**Why `status` exists:** there is deliberately no hard delete for partners or campaigns — attribution, positions and revenue history must be preserved. A soft disable (`active` → `disabled`) switches a partner or campaign off without losing data. Reverse it with the same PATCH and `"status": "active"`.
 
-**Тест-кейсы:**
-- [ ] Обновление `revenue_share_pct` → значение изменилось
-- [ ] `{"status":"disabled"}` → партнёр disabled, виден в `GET /partners?status=disabled`
-- [ ] `{"status":"active"}` → снова active
+**What `status: "disabled"` triggers:**
+1. Every live API key of the partner is revoked immediately (`revoked: true`) — the partner loses access to all endpoints.
+2. A key bound to a disabled partner is rejected at authentication time, even if it was never revoked.
+3. New keys cannot be issued for a disabled partner (**400**).
+4. Switching back to `active` does **not** restore revoked keys — issue a new one via `POST /api/v1/keys`.
+
+**Test cases:**
+- [ ] Response is the envelope `{ "object": "partner", "data": { ... } }` with the same field set as `GET /partners/:id` (including `status`)
+- [ ] Updating `revenue_share_pct` → the value changes
+- [ ] `{"status":"disabled"}` → partner is disabled and appears in `GET /partners?status=disabled`
+- [ ] After disable: `GET /api/v1/keys` → the partner's keys show `revoked: true`
+- [ ] After disable: any `/api/v1/partner/*` call with that partner's key → **401** (key revoked)
+- [ ] `{"status":"active"}` → active again (keys stay revoked — issue a new one)
 - [ ] `{"status":"deleted"}` → **400**
-- [ ] `updated_at` обновился
-- [ ] Несуществующий ID → **404**
+- [ ] `updated_at` is refreshed
+- [ ] Unknown ID → **404**
 
-#### `POST /api/v1/partners/:id/campaigns` — Создать кампанию
+#### `POST /api/v1/partners/:id/campaigns` — Create a campaign
 
 ```bash
 curl -X POST https://partner-api-production-10ad.up.railway.app/api/v1/partners/ptn_seed_acme/campaigns \
@@ -243,19 +268,19 @@ curl -X POST https://partner-api-production-10ad.up.railway.app/api/v1/partners/
   -d '{"name": "Test Campaign", "slug": "test-campaign", "utm_source": "test", "utm_medium": "manual"}'
 ```
 
-#### `GET /api/v1/partners/:id/campaigns` — Кампании партнёра
+#### `GET /api/v1/partners/:id/campaigns` — Campaigns of a partner
 
 ```bash
 curl https://partner-api-production-10ad.up.railway.app/api/v1/partners/ptn_seed_acme/campaigns \
   -H "Authorization: Bearer tsk_test_master_full_access_000000000000000"
 ```
 
-**Тест-кейсы:**
-- [ ] Acme → 2 кампании (`cmp_seed_acme_launch`, `cmp_seed_acme_earn`)
-- [ ] Orbit → 2 кампании (`cmp_seed_orbit_q3`, `cmp_seed_orbit_app`)
-- [ ] `?status=disabled` после soft-disable кампании
+**Test cases:**
+- [ ] Acme → 2 campaigns (`cmp_seed_acme_launch`, `cmp_seed_acme_earn`)
+- [ ] Orbit → 2 campaigns (`cmp_seed_orbit_q3`, `cmp_seed_orbit_app`)
+- [ ] `?status=disabled` after soft-disabling a campaign
 
-#### `PATCH /api/v1/partners/:id/campaigns/:campaignId` — Обновить / дизейблить кампанию
+#### `PATCH /api/v1/partners/:id/campaigns/:campaignId` — Update or disable a campaign
 
 ```bash
 curl -X PATCH https://partner-api-production-10ad.up.railway.app/api/v1/partners/ptn_seed_acme/campaigns/cmp_seed_acme_launch \
@@ -264,79 +289,83 @@ curl -X PATCH https://partner-api-production-10ad.up.railway.app/api/v1/partners
   -d '{"status": "disabled"}'
 ```
 
-**Тест-кейсы:**
-- [ ] `status: disabled` → кампания выключена
-- [ ] Чужой `campaignId` для партнёра → **404**
-- [ ] Можно менять `name` / `utm_source` / `utm_medium`
+**Test cases:**
+- [ ] `status: disabled` → the campaign is switched off
+- [ ] A `campaignId` belonging to another partner → **404**
+- [ ] `name` / `utm_source` / `utm_medium` can be changed
 
 ---
 
-### 3.3 Partner Self-Service API (`/api/v1/partner`)
+### 3.3 Partner self-service API (`/api/v1/partner`)
 
-Требуемый скоуп: `partner:read`
-Ключ должен быть привязан к партнёру (`partner_id`).
+Required scope: `partner:read`
+The key must be bound to a partner (`partner_id`).
 
-> Используй `tsk_test_acme_partner_key_00000000000000000` для Acme или `tsk_test_orbit_partner_key_0000000000000000` для Orbit.
+> Use `tsk_test_acme_partner_key_00000000000000000` for Acme or `tsk_test_orbit_partner_key_0000000000000000` for Orbit.
 
-#### `GET /api/v1/partner/summary` — Сводка по партнёру
+#### `GET /api/v1/partner/summary` — Partner summary
 
 ```bash
 curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/summary \
   -H "Authorization: Bearer tsk_test_acme_partner_key_00000000000000000"
 ```
 
-**Тест-кейсы:**
-- [ ] Содержит: `partner`, `users`, `deposits`, `tvl`, `yield`, `points`, `revenue`
-- [ ] `users.total` — количество привязанных пользователей (Acme: 2, Orbit: 1)
-- [ ] `revenue.revenue_share_pct` — совпадает с настройкой партнёра (Acme: 0.15)
-- [ ] С bootstrap-ключом (без `partner_id`) → **403** "requires a partner-scoped API key"
+**Test cases:**
+- [ ] Contains `partner`, `users`, `deposits`, `tvl`, `yield`, `points`, `revenue`
+- [ ] `users.total` — number of attributed users (Acme: 2, Orbit: 1)
+- [ ] `revenue.revenue_share_pct` — matches the partner's setting (Acme: 0.15)
+- [ ] With the bootstrap key (no `partner_id`) → **403** "requires a partner-scoped API key"
 
-#### `GET /api/v1/partner/users` — Привязанные пользователи
+#### `GET /api/v1/partner/users` — Attributed users
 
 ```bash
 curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/users \
   -H "Authorization: Bearer tsk_test_acme_partner_key_00000000000000000"
 ```
 
-**Тест-кейсы:**
-- [ ] Acme → 2 пользователя (`usr_seed_nova`, `usr_seed_orbit`)
-- [ ] Orbit → 1 пользователь (`usr_seed_quill`)
-- [ ] Пользователи другого партнёра **не** видны
+**Test cases:**
+- [ ] Acme → 2 users (`usr_seed_nova`, `usr_seed_orbit`)
+- [ ] Orbit → 1 user (`usr_seed_quill`)
+- [ ] Another partner's users are **not** visible
 
-#### `GET /api/v1/partner/deposits` — Депозиты
+#### `GET /api/v1/partner/deposits` — Deposits
 
 ```bash
 curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/deposits \
   -H "Authorization: Bearer tsk_test_acme_partner_key_00000000000000000"
 ```
 
-**Тест-кейсы:**
+**Test cases:**
 - [ ] Acme: `total` = $85,000 (25k + 10k + 50k), `count` = 3
 - [ ] Orbit: `total` = $5,000, `count` = 1
 
-#### `GET /api/v1/partner/withdrawals` — Выводы
+#### `GET /api/v1/partner/withdrawals` — Withdrawals
 
 #### `GET /api/v1/partner/tvl` — Net TVL
 
-**Тест-кейсы:**
-- [ ] Acme TVL: сумма principal активных позиций = $85,000
-- [ ] Orbit TVL: $0 (единственная позиция `closed`)
+**Test cases:**
+- [ ] Acme TVL: sum of the principal of active positions = $85,000
+- [ ] Orbit TVL: $0 (its only position is `closed`)
 
-#### `GET /api/v1/partner/yield` — Начисленный yield
+#### `GET /api/v1/partner/yield` — Accrued yield
 
-#### `GET /api/v1/partner/yield/history/:asset` — История yield по активу
+#### `GET /api/v1/partner/yield/history/:asset` — Yield history for an asset
 
 ```bash
 curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/yield/history/USDC \
   -H "Authorization: Bearer tsk_test_acme_partner_key_00000000000000000"
 ```
 
-**Тест-кейсы:**
-- [ ] `USDC` → массив `history` из 30 точек, `blend_apy` > 0
-- [ ] `USDT` → аналогично
-- [ ] `ETH` → **404** "Unsupported asset"
+> **Deprecated.** Use `GET /api/v1/yield/history/:asset` instead (see 3.4). This endpoint returns the **protocol-wide** blended APY, not partner data, so it does not belong under `/partner/*`. The alias is kept so existing integrations keep working and returns an identical payload — but, like every route under `/partner/*`, it still requires a partner-scoped key.
 
-#### `GET /api/v1/partner/points` — Начисленные поинты
+**Test cases:**
+- [ ] `USDC` → a `history` array of 30 points, `blend_apy` > 0, `scope: "protocol"`
+- [ ] `USDT` → same
+- [ ] `ETH` → **404** "Unsupported asset"
+- [ ] A key with the `partner:read` scope but `partner_id: null` → **403** "requires a partner-scoped API key"
+- [ ] Payload is identical to `GET /api/v1/yield/history/:asset`
+
+#### `GET /api/v1/partner/points` — Accrued points
 
 #### `GET /api/v1/partner/revenue` — Revenue share
 
@@ -345,57 +374,107 @@ curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/revenue \
   -H "Authorization: Bearer tsk_test_acme_partner_key_00000000000000000"
 ```
 
-**Тест-кейсы:**
-- [ ] `revenue_share_pct` = 0.15 для Acme
-- [ ] Содержит `annual` и `daily` расчёты
+**Test cases:**
+- [ ] `revenue_share_pct` = 0.15 for Acme
+- [ ] Contains the `annual` and `daily` breakdowns
 - [ ] `partner_revenue` > 0
+- [ ] `protocol_blend_apy` is **the same** for Acme and Orbit (it is the protocol rate, not a partner one). The field was previously named `blend_apy`
+- [ ] `tvl`, by contrast, **differs** between partners
 
-#### `GET /api/v1/partner/user/:id/positions` — Позиции пользователя
+#### `GET /api/v1/partner/user/:id/positions` — Positions of a user
 
 ```bash
 curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/user/usr_seed_nova/positions \
   -H "Authorization: Bearer tsk_test_acme_partner_key_00000000000000000"
 ```
 
-**Тест-кейсы:**
-- [ ] `usr_seed_nova` через Acme-ключ → 2 позиции (`pos_seed_alpha`, `pos_seed_gamma`) + `current_value` и `accrued_yield`
-- [ ] `usr_seed_quill` через Acme-ключ → **403** "not attributed to your partner"
-- [ ] `usr_seed_quill` через Orbit-ключ → 1 позиция (`pos_seed_delta`)
+**Test cases:**
+- [ ] `usr_seed_nova` with the Acme key → 2 positions (`pos_seed_alpha`, `pos_seed_gamma`) plus `current_value` and `accrued_yield`
+- [ ] `usr_seed_quill` with the Acme key → **403** "not attributed to your partner"
+- [ ] `usr_seed_quill` with the Orbit key → 1 position (`pos_seed_delta`)
 
 ---
 
-## 4. Проверки безопасности
+### 3.4 Protocol yield (`/api/v1/yield`)
 
-| # | Тест | Ожидаемый результат |
+Required scope: `read` **or** `partner:read`. A partner binding is **not** required — this data is protocol-level.
+
+The rule that separates the namespaces:
+
+| Namespace | What lives there | Key |
 |---|---|---|
-| S1 | Запрос без `Authorization` | 401 |
-| S2 | Запрос с невалидным ключом | 401 |
-| S3 | Запрос с отозванным ключом | 401 |
-| S4 | `partner:read` ключ → `GET /api/v1/partners` (admin) | 403 |
-| S5 | `read` ключ → `GET /api/v1/partner/summary` | 403 |
-| S6 | Acme-ключ → `GET /api/v1/partner/user/usr_seed_quill/positions` | 403 (чужой пользователь) |
-| S7 | Создание ключа с `scopes: ["*"]` | 400 |
-| S8 | Создание ключа с `environment: "live"` | 400 |
-| S9 | `GET /api/v1/keys` → проверить что `secret_hash` отсутствует в ответе | Отсутствует |
-| S10 | Rate limiting: 60+ запросов за минуту | 429 Too Many Requests |
+| `/api/v1/partner/*` | Partner data only. Every route requires a key with a `partner_id` | partner-scoped |
+| `/api/v1/yield/*` | Protocol metrics, identical for everyone | any `read` / `partner:read` key, no `partner_id` needed |
+
+#### `GET /api/v1/yield/history/:asset` — Blended APY history for an asset
+
+```bash
+curl https://partner-api-production-10ad.up.railway.app/api/v1/yield/history/USDC \
+  -H "Authorization: Bearer tsk_test_master_full_access_000000000000000"
+```
+
+Allocation-weighted APY across all active Thesauros vaults for the asset. The series is **identical for every caller** — it is a protocol showcase metric, not partner-attributed funds. Flagged explicitly by `data.scope: "protocol"`. The series is deterministic (sandbox), not a real historical export.
+
+**Test cases:**
+- [ ] `USDC` → `scope: "protocol"`, `blend_apy` > 0, `history` of 30 points
+- [ ] The response is **identical** for the Acme key, the Orbit key and the master key (`partner_id: null`)
+- [ ] A key with `partner:read` and `partner_id: null` → **200** (unlike the deprecated alias under `/partner/*`)
+- [ ] A key with neither `read` nor `partner:read` → **403**
+- [ ] `ETH` → **404** "Unsupported asset"
 
 ---
 
-## 5. Проверки формата ответов
+## 4. Security checks
 
-- [ ] Все успешные ответы обёрнуты в `{ "object": "...", "data": ... }`
-- [ ] Все ошибки содержат `{ "error": { "code": "...", "message": "..." } }`
-- [ ] HTTP-коды: 200 (ok), 201 (created), 400 (validation), 401 (no/bad auth), 403 (forbidden), 404 (not found), 429 (rate limit)
+| # | Test | Expected result |
+|---|---|---|
+| S1 | Request without `Authorization` | 401 |
+| S2 | Request with an invalid key | 401 |
+| S3 | Request with a revoked key | 401 |
+| S4 | `partner:read` key → `GET /api/v1/partners` (admin) | 403 |
+| S5 | `read` key → `GET /api/v1/partner/summary` | 403 |
+| S6 | Acme key → `GET /api/v1/partner/user/usr_seed_quill/positions` | 403 (another partner's user) |
+| S7 | Creating a key with `scopes: ["*"]` | 400 |
+| S8 | Creating a key with `environment: "live"` | 400 |
+| S9 | `GET /api/v1/keys` and `POST /api/v1/keys` → check that `secret_hash` and `_plaintext_secret` are absent | Absent |
+| S10 | Rate limiting: 61 requests in a minute with one key (endpoints may vary) | 61st → 429 Too Many Requests |
+| S11 | Key of a `disabled` partner | 401 (revoked) / 403 (partner disabled) |
+| S12 | Key with `partner:read` but `partner_id: null` → any `/api/v1/partner/*` route | 403 |
+| S13 | The same key → `GET /api/v1/yield/history/USDC` | 200 (protocol data, no partner needed) |
+
+### Rate limiting
+
+The limit is **60 requests per minute per API key, across all endpoints combined** (per IP when no key is supplied). The budget used to be counted per endpoint, which is why a 429 only appeared after ~200 requests; it is now a single shared budget.
+
+Every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`; a 429 adds `Retry-After`.
+
+```bash
+for i in $(seq 1 61); do
+  curl -s -o /dev/null -w "%{http_code}\n" \
+    https://partner-api-production-10ad.up.railway.app/api/v1/partner/summary \
+    -H "Authorization: Bearer tsk_test_acme_partner_key_00000000000000000"
+done | sort | uniq -c
+# expected: 60x 200, 1x 429
+```
 
 ---
 
-## 6. Инструменты для тестирования
+## 5. Response format checks
 
-1. **Swagger UI** — интерактивное тестирование прямо в браузере:
+- [ ] Every successful response is wrapped in `{ "object": "...", "data": ... }` — exactly two top-level fields
+- [ ] The envelope's `object` matches `data.object` for single resources, and is `"list"` for arrays
+- [ ] Every error carries `{ "error": { "code": "...", "message": "..." } }`
+- [ ] HTTP codes: 200 (ok), 201 (created), 400 (validation), 401 (no/bad auth), 403 (forbidden), 404 (not found), 429 (rate limit)
+
+---
+
+## 6. Testing tools
+
+1. **Swagger UI** — interactive testing straight from the browser:
    `https://partner-api-production-10ad.up.railway.app/swagger`
-   Нажать "Authorize" → вставить ключ → вызывать эндпоинты
+   Click "Authorize" → paste a key → call the endpoints
 
-2. **curl** — примеры выше
+2. **curl** — see the examples above
 
-3. **Postman** — импортировать Swagger JSON:
+3. **Postman** — import the Swagger JSON:
    `https://partner-api-production-10ad.up.railway.app/swagger-json`

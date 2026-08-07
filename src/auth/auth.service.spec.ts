@@ -131,5 +131,43 @@ describe('AuthService', () => {
       const result = await service.authenticate('tsk_test_acme_partner_key_00000000000000000');
       expect('error' in result).toBe(true);
     });
+
+    it('revokes every live key of a partner', async () => {
+      const extra = await service.generateKey({ label: 'Second Acme key', partner_id: 'ptn_seed_acme' });
+      const revoked = await service.revokeKeysForPartner('ptn_seed_acme');
+      expect(revoked).toEqual(expect.arrayContaining(['key_seed_acme', extra.id]));
+      const untouched = await store.get<any>('keys', 'key_seed_orbit');
+      expect(untouched!.revoked).toBe(false);
+    });
+  });
+
+  describe('disabled partners', () => {
+    it('authenticate refuses a key bound to a disabled partner', async () => {
+      await store.update('partners', 'ptn_seed_acme', { status: 'disabled' });
+      const result = await service.authenticate('tsk_test_acme_partner_key_00000000000000000');
+      expect(result).toEqual({
+        error: expect.stringMatching(/disabled/i),
+        reason: 'forbidden',
+      });
+    });
+
+    it('authenticate still accepts keys with no partner binding', async () => {
+      await store.update('partners', 'ptn_seed_acme', { status: 'disabled' });
+      const result = await service.authenticate('tsk_test_thesauros_sandbox_0000000000000000');
+      expect('key' in result).toBe(true);
+    });
+
+    it('generateKey refuses a disabled partner', async () => {
+      await store.update('partners', 'ptn_seed_acme', { status: 'disabled' });
+      await expect(
+        service.generateKey({ label: 'Nope', partner_id: 'ptn_seed_acme' }),
+      ).rejects.toThrow(/disabled/i);
+    });
+
+    it('generateKey refuses an unknown partner', async () => {
+      await expect(
+        service.generateKey({ label: 'Nope', partner_id: 'ptn_does_not_exist' }),
+      ).rejects.toThrow(/does not exist/i);
+    });
   });
 });

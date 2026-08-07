@@ -32,7 +32,7 @@ describe('RevenueService', () => {
     expect(result!.revenue_share_pct).toBe(0.15);
     expect(result!.protocol_fee_rate).toBe(0.1);
     expect(result!.tvl).toBeGreaterThan(0);
-    expect(result!.blend_apy).toBeGreaterThan(0);
+    expect(result!.protocol_blend_apy).toBeGreaterThan(0);
     expect(result!.annual.partner_revenue).toBeGreaterThan(0);
     expect(result!.daily.partner_revenue).toBeGreaterThan(0);
     expect(result!.annual.partner_revenue).toBeGreaterThan(result!.daily.partner_revenue);

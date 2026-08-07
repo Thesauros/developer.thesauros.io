@@ -23,7 +23,9 @@ export class AuthController {
   @ApiOkResponse({ type: ApiKeyOutputDto })
   async createKey(@Body() dto: CreateKeyInputDto): Promise<ApiKeyOutputDto> {
     const result = await this.authService.generateKey(dto);
-    return { ...result, secret: result._plaintext_secret } as unknown as ApiKeyOutputDto;
+    // publicKey() whitelists the response so secret_hash, the encrypted secret
+    // and _plaintext_secret never leak; `secret` carries the one-time plaintext.
+    return this.authService.publicKey(result, result._plaintext_secret) as unknown as ApiKeyOutputDto;
   }
 
   @Get()

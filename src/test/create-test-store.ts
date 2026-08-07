@@ -7,6 +7,15 @@ export async function createTestStore(): Promise<{
   dataSource: DataSource;
   store: StoreService;
 }> {
+  const dataSource = await createTestDataSource();
+  const store = new StoreService(dataSource);
+  process.env.DB_SEED = 'true';
+  await store.onModuleInit();
+  return { dataSource, store };
+}
+
+/** In-memory Postgres with the real entity schema — no Docker required. */
+export async function createTestDataSource(): Promise<DataSource> {
   const db = newDb({ autoCreateForeignKeyIndices: true });
   db.public.registerFunction({
     name: 'version',
@@ -31,10 +40,7 @@ export async function createTestStore(): Promise<{
     synchronize: true,
   });
   await dataSource.initialize();
-  const store = new StoreService(dataSource);
-  process.env.DB_SEED = 'true';
-  await store.onModuleInit();
-  return { dataSource, store };
+  return dataSource;
 }
 
 export async function destroyTestStore(dataSource: DataSource): Promise<void> {

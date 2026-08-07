@@ -126,7 +126,11 @@ export class StoreService implements OnModuleInit {
   ): Promise<T | null> {
     const existing = await this.get<T>(collection, id);
     if (!existing) return null;
-    return (await this.repo<T>(collection).save({ ...existing, ...patch, id } as any)) as T;
+    await this.repo<T>(collection).save({ ...existing, ...patch, id } as any);
+    // Re-read instead of trusting save()'s return value: TypeORM echoes back the
+    // object it was handed, so columns the caller did not touch could go missing
+    // from the response (PATCH /partners/:id was dropping `status`).
+    return this.get<T>(collection, id);
   }
 
   async remove(collection: StoreCollection, id: string): Promise<boolean> {

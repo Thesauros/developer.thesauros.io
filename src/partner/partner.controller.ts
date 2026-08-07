@@ -76,12 +76,20 @@ export class PartnerController {
   @ApiParam({ name: 'id', example: 'ptn_seed_acme' })
   @ApiOperation({
     summary: 'Update partner',
-    description: 'Partial update. Pass status:"disabled" to soft-disable without deleting history/attributions.',
+    description:
+      'Partial update. Pass status:"disabled" to soft-disable without deleting history/attributions. ' +
+      'Disabling a partner immediately revokes all of its API keys; re-enabling does not restore them, ' +
+      'issue a new key instead.',
   })
   @ApiOkResponse({ type: PartnerOutputDto })
   async updatePartner(@Param('id') id: string, @Body() dto: UpdatePartnerInputDto): Promise<PartnerOutputDto> {
+    const before = await this.partnerService.getPartner(id);
+    if (!before) throw new NotFoundException(`Partner "${id}" not found.`);
     const partner = await this.partnerService.updatePartner(id, dto as any);
     if (!partner) throw new NotFoundException(`Partner "${id}" not found.`);
+    if (dto.status === 'disabled' && before.status !== 'disabled') {
+      await this.authService.revokeKeysForPartner(id);
+    }
     return partner as unknown as PartnerOutputDto;
   }
 

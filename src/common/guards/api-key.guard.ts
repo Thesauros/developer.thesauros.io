@@ -33,15 +33,20 @@ export class ApiKeyGuard implements CanActivate {
     const secret = match[1].trim();
     const result = await this.authService.authenticate(secret);
     if ('error' in result) {
+      if (result.reason === 'forbidden') {
+        throw new ForbiddenException(result.error);
+      }
       throw new UnauthorizedException(result.error);
     }
-    const requiredScope = this.reflector.getAllAndOverride<string>(REQUIRED_SCOPE_KEY, [
+    const requiredScopes = this.reflector.getAllAndOverride<string[]>(REQUIRED_SCOPE_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
-    if (requiredScope && !this.authService.hasScope(result.key, requiredScope)) {
+    if (requiredScopes?.length && !requiredScopes.some((s) => this.authService.hasScope(result.key, s))) {
       throw new ForbiddenException(
-        `This API key lacks the "${requiredScope}" scope required for this endpoint.`,
+        requiredScopes.length === 1
+          ? `This API key lacks the "${requiredScopes[0]}" scope required for this endpoint.`
+          : `This API key lacks any of the scopes required for this endpoint: ${requiredScopes.join(', ')}.`,
       );
     }
     (request as any).apiKey = result.key;
