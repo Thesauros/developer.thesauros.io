@@ -356,13 +356,20 @@ curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/yield/his
   -H "Authorization: Bearer tsk_test_acme_partner_key_00000000000000000"
 ```
 
-> **Deprecated.** Use `GET /api/v1/yield/history/:asset` instead (see 3.4). This endpoint returns the **protocol-wide** blended APY, not partner data, so it does not belong under `/partner/*`. The alias is kept so existing integrations keep working and returns an identical payload — but, like every route under `/partner/*`, it still requires a partner-scoped key.
+> **Deprecated — use `GET /api/v1/yield/history/:asset` instead (see 3.4).**
+>
+> **This endpoint returns no partner data.** The series is the protocol-wide blended APY of the asset and is byte-for-byte identical for Acme, for Orbit and for an admin key with no partner at all. The endpoint takes no `partner_id` as input — it never did, and moving it did not change that. It is flagged in the payload by `scope: "protocol"`.
+>
+> That is exactly why it no longer belongs under `/partner/*`, and why the canonical route now lives in the protocol namespace where **no partner binding is required**.
+>
+> This alias is kept only so existing integrations keep working. It returns the identical payload, but still demands a partner-scoped key — that is a statement about *access*, not about *content*: every route under `/partner/*` requires a partner-bound key, without exception, so QA never has to reason about a third category of endpoint.
 
 **Test cases:**
 - [ ] `USDC` → a `history` array of 30 points, `blend_apy` > 0, `scope: "protocol"`
 - [ ] `USDT` → same
+- [ ] The response for the Acme key and the Orbit key is **identical** — no per-partner figures here
 - [ ] `ETH` → **404** "Unsupported asset"
-- [ ] A key with the `partner:read` scope but `partner_id: null` → **403** "requires a partner-scoped API key"
+- [ ] A key with the `partner:read` scope but `partner_id: null` → **403** "requires a partner-scoped API key" (access rule of the `/partner/*` namespace; the same key gets **200** on the canonical route in 3.4)
 - [ ] Payload is identical to `GET /api/v1/yield/history/:asset`
 
 #### `GET /api/v1/partner/points` — Accrued points
@@ -399,6 +406,8 @@ curl https://partner-api-production-10ad.up.railway.app/api/v1/partner/user/usr_
 
 Required scope: `read` **or** `partner:read`. A partner binding is **not** required — this data is protocol-level.
 
+> **Publicly readable by any valid key.** Nothing here is partner-scoped: every caller gets the same numbers, and no endpoint in this namespace accepts or infers a `partner_id`.
+
 The rule that separates the namespaces:
 
 | Namespace | What lives there | Key |
@@ -411,6 +420,19 @@ The rule that separates the namespaces:
 ```bash
 curl https://partner-api-production-10ad.up.railway.app/api/v1/yield/history/USDC \
   -H "Authorization: Bearer tsk_test_master_full_access_000000000000000"
+```
+
+Prove for yourself that the series carries no partner data — three different keys, one identical body:
+
+```bash
+BASE=https://partner-api-production-10ad.up.railway.app
+for KEY in tsk_test_master_full_access_000000000000000 \
+           tsk_test_acme_partner_key_00000000000000000 \
+           tsk_test_orbit_partner_key_0000000000000000; do
+  curl -s "$BASE/api/v1/yield/history/USDC" -H "Authorization: Bearer $KEY" \
+    | python3 -c "import sys,json; d=json.load(sys.stdin)['data']; print(d['blend_apy'], [p['apy'] for p in d['history']])"
+done | sort -u | wc -l
+# expected: 1  (one distinct response across an admin key and two different partners)
 ```
 
 Allocation-weighted APY across all active Thesauros vaults for the asset. The series is **identical for every caller** — it is a protocol showcase metric, not partner-attributed funds. Flagged explicitly by `data.scope: "protocol"`. The series is deterministic (sandbox), not a real historical export.
