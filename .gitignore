@@ -1,7 +1,8 @@
-.next
 node_modules
+.next
 out
 dist
+coverage
 *.tsbuildinfo
 .env*.local
 .env
