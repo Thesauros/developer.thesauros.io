@@ -64,6 +64,10 @@ See `.env.example`. Key variables:
 - `CORS_ORIGINS` — allowed origins (e.g. the portal deployment)
 - `PARTNER_API_URL` — where the portal's Next.js rewrites proxy
   `/api/v1/partners/*` and `/api/v1/partner/*` (set in the portal repo)
+- `MONITOR_API_URL`, `MONITOR_NETWORKS` — monitoring service used for observed
+  on-chain balances in `/api/v1/reconciliation/report`
+- `APY_SNAPSHOTS`, `ANALYTICS_BASELINE_PROVIDER`, `RECONCILIATION_TOLERANCE_BPS`
+  — analytics/reconciliation knobs (see `.env.example`)
 
 ## API surface (v1)
 
@@ -76,6 +80,12 @@ Partner Attribution v1 (public integration surface):
 | Campaigns | `POST /api/v1/partners/:id/campaigns`, `GET /api/v1/partners/:id/campaigns`, `PATCH /api/v1/partners/:id/campaigns/:campaignId` |
 | Partner portal data | `GET /api/v1/partner/summary`, `GET /api/v1/partner/users`, `GET /api/v1/partner/deposits`, `GET /api/v1/partner/yield/history/:asset`, `GET /api/v1/partner/revenue`, `GET /api/v1/partner/user/:id/positions` |
 | Yield | `GET /api/v1/yield/history/:asset` |
+| Webhooks | `POST /api/v1/webhooks`, `GET /api/v1/webhooks`, `DELETE /api/v1/webhooks/:id`, `POST /api/v1/webhooks/:id/test`, `GET /api/v1/webhooks/events`, `GET /api/v1/webhooks/:id/deliveries` |
+| Usage | `GET /api/v1/usage?range=` |
+| Users | `POST /api/v1/users`, `GET /api/v1/users/:id/ledger` |
+| Status | `GET /api/v1/status` (public) |
+| Analytics | `GET /api/v1/analytics/{signals,regime,uplift,decisions,advisor}` |
+| Reconciliation | `GET /api/v1/reconciliation/{balances,ledger,snapshots,report}` |
 
 Cross-cutting behavior:
 
