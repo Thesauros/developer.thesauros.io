@@ -9,6 +9,10 @@ import { CryptoModule } from './crypto/crypto.module';
 import { AuthModule } from './auth/auth.module';
 import { PartnerModule } from './partner/partner.module';
 import { YieldModule } from './yield/yield.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import { UsageModule } from './usage/usage.module';
+import { UsersModule } from './users/users.module';
+import { StatusModule } from './status/status.module';
 
 @Module({
   imports: [
@@ -23,6 +27,10 @@ import { YieldModule } from './yield/yield.module';
     AuthModule,
     PartnerModule,
     YieldModule,
+    WebhooksModule,
+    UsageModule,
+    UsersModule,
+    StatusModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ApiThrottlerGuard },

@@ -7,6 +7,9 @@ import { PositionEntity } from './position.entity';
 import { VaultEntity } from './vault.entity';
 import { PositionEventEntity } from './position-event.entity';
 import { LockEntity } from './lock.entity';
+import { WebhookEntity } from './webhook.entity';
+import { WebhookDeliveryEntity } from './webhook-delivery.entity';
+import { RequestLogEntity } from './request-log.entity';
 
 export const entities = [
   PartnerEntity,
@@ -18,6 +21,9 @@ export const entities = [
   VaultEntity,
   PositionEventEntity,
   LockEntity,
+  WebhookEntity,
+  WebhookDeliveryEntity,
+  RequestLogEntity,
 ];
 
 export {
@@ -30,6 +36,9 @@ export {
   VaultEntity,
   PositionEventEntity,
   LockEntity,
+  WebhookEntity,
+  WebhookDeliveryEntity,
+  RequestLogEntity,
 };
 
 export type StoreCollection =
@@ -41,4 +50,6 @@ export type StoreCollection =
   | 'positions'
   | 'vaults'
   | 'positionEvents'
-  | 'locks';
+  | 'locks'
+  | 'webhooks'
+  | 'webhookDeliveries';

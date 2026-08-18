@@ -12,6 +12,8 @@ import {
   StoreCollection,
   UserEntity,
   VaultEntity,
+  WebhookDeliveryEntity,
+  WebhookEntity,
 } from '../database/entities';
 
 export interface StoreRecord {
@@ -70,6 +72,8 @@ const COLLECTION_ENTITY: Record<StoreCollection, EntityTarget<ObjectLiteral>> = 
   vaults: VaultEntity,
   positionEvents: PositionEventEntity,
   locks: LockEntity,
+  webhooks: WebhookEntity,
+  webhookDeliveries: WebhookDeliveryEntity,
 };
 
 @Injectable()
