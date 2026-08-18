@@ -10,6 +10,7 @@ import { LockEntity } from './lock.entity';
 import { WebhookEntity } from './webhook.entity';
 import { WebhookDeliveryEntity } from './webhook-delivery.entity';
 import { RequestLogEntity } from './request-log.entity';
+import { VaultApySnapshotEntity } from './vault-apy-snapshot.entity';
 
 export const entities = [
   PartnerEntity,
@@ -24,6 +25,7 @@ export const entities = [
   WebhookEntity,
   WebhookDeliveryEntity,
   RequestLogEntity,
+  VaultApySnapshotEntity,
 ];
 
 export {
@@ -39,6 +41,7 @@ export {
   WebhookEntity,
   WebhookDeliveryEntity,
   RequestLogEntity,
+  VaultApySnapshotEntity,
 };
 
 export type StoreCollection =

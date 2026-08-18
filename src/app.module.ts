@@ -13,6 +13,8 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { UsageModule } from './usage/usage.module';
 import { UsersModule } from './users/users.module';
 import { StatusModule } from './status/status.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { ReconciliationModule } from './reconciliation/reconciliation.module';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { StatusModule } from './status/status.module';
     UsageModule,
     UsersModule,
     StatusModule,
+    AnalyticsModule,
+    ReconciliationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ApiThrottlerGuard },

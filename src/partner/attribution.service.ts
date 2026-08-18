@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { StoreService } from '../store/store.service';
+import { accrue, round2 } from '../common/accrual';
 
 interface Attribution {
   id: string;
@@ -32,12 +33,6 @@ interface User {
   label: string;
   wallets: string[];
   [key: string]: unknown;
-}
-
-const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
 }
 
 @Injectable()
@@ -93,14 +88,9 @@ export class AttributionService {
     return this.store.filter<Position>('positions', (p) => p.partner_id === partnerId);
   }
 
+  /** Shared with analytics and reconciliation so all three agree on value. */
   private withAccrual(position: Position): Position & { current_value: number; accrued_yield: number } {
-    const apy = position.apy ?? 0;
-    const openedMs = Date.parse(position.opened_at);
-    const endMs = position.status === 'closed' ? Date.parse(position.updated_at) : Date.now();
-    const elapsedYears = Math.max(0, (endMs - openedMs) / YEAR_MS);
-    const current_value = round2(position.principal * (1 + apy * elapsedYears));
-    const accrued_yield = round2(current_value - position.principal);
-    return { ...position, current_value, accrued_yield };
+    return accrue(position);
   }
 
   async getAttributedDeposits(partnerId: string): Promise<{

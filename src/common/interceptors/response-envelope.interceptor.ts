@@ -7,6 +7,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { Observable, map } from 'rxjs';
 import { Request, Response } from 'express';
+import { Paged } from '../paged';
 
 export interface EnvelopedResponse<T = unknown> {
   object: string;
@@ -22,10 +23,16 @@ export class ResponseEnvelopeInterceptor implements NestInterceptor {
     const requestId = randomUUID();
     response.setHeader('X-Request-Id', requestId);
     return next.handle().pipe(
-      map((body: unknown) => ({
-        object: this.resolveObjectType(request.path, body),
-        data: body ?? null,
-      })),
+      map((body: unknown) => {
+        // Paginated lists carry their own meta (total, limit, next_cursor).
+        if (body instanceof Paged) {
+          return { object: 'list', data: body.data, meta: body.meta };
+        }
+        return {
+          object: this.resolveObjectType(request.path, body),
+          data: body ?? null,
+        };
+      }),
     );
   }
 
