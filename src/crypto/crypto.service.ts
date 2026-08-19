@@ -55,7 +55,7 @@ export class CryptoService {
     const iv = packed.subarray(0, IV_LENGTH);
     const tag = packed.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
     const data = packed.subarray(IV_LENGTH + TAG_LENGTH);
-    const decipher = createDecipheriv(ALGORITHM, this.key, iv);
+    const decipher = createDecipheriv(ALGORITHM, this.key, iv, { authTagLength: TAG_LENGTH });
     decipher.setAuthTag(tag);
     return decipher.update(data, undefined, 'utf8') + decipher.final('utf8');
   }
