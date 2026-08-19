@@ -88,6 +88,13 @@ class HttpClient:
         self.api_key = api_key
         # Guarantee exactly one trailing slash so path joining is stable.
         self.base_url = (base_url or DEFAULT_BASE_URL).rstrip("/") + "/"
+        # urllib.request follows non-HTTP schemes (file://, ftp://); the client
+        # only ever talks to an HTTP(S) API, so reject anything else up front.
+        scheme = urllib.parse.urlsplit(self.base_url).scheme
+        if scheme not in ("http", "https"):
+            raise ThesaurosError(
+                f"base_url must be http(s), got {scheme!r}: {self.base_url}"
+            )
         self.timeout = timeout
         self.max_retries = max_retries
         self.last_response: Optional[LastResponse] = None
@@ -175,7 +182,9 @@ class HttpClient:
         them uniformly. Transport failures raise :class:`NetworkError`.
         """
         try:
-            resp = urllib.request.urlopen(req, timeout=self.timeout)
+            # Scheme is validated to http(s) in __init__; the URL is built from
+            # base_url + path by _build_url, never taken raw from a caller.
+            resp = urllib.request.urlopen(req, timeout=self.timeout)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
         except urllib.error.HTTPError as exc:
             # HTTPError is itself a response-like object for non-2xx statuses.
             body = exc.read().decode("utf-8", errors="replace")
