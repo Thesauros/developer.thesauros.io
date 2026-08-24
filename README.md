@@ -87,6 +87,16 @@ Partner Attribution v1 (public integration surface):
 | Analytics | `GET /api/v1/analytics/{signals,regime,uplift,decisions,advisor}` |
 | Reconciliation | `GET /api/v1/reconciliation/{balances,ledger,snapshots,report}` |
 
+### Schema
+
+- Swagger UI: `/swagger`
+- Raw OpenAPI 3 for Postman/Insomnia import: `/api/v1/openapi.json`
+
+Both ship in production (`SWAGGER=false` withholds them). Response schemas
+describe the envelope you actually receive — `{object, data}` for a single
+resource, `{object:"list", data, meta}` for collections — with a worked
+example on every field.
+
 ### Scopes & test keys
 
 Key kinds: **admin** (`read`, `write`, …, no partner binding) and **partner**
