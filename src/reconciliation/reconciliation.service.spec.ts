@@ -25,7 +25,7 @@ function observedSnapshot(usdc: number, usdt: number): ObservedSnapshot {
     networks: ['base', 'arbitrum'],
     vaults: [
       { address: '0xaaa', name: 'Aave V3 USDC Core', asset: 'USDC', network: 'base', tvl: usdc, active_provider: null },
-      { address: '0xbbb', name: 'Morpho Blue USDT', asset: 'USDT', network: 'arbitrum', tvl: usdt, active_provider: null },
+      { address: '0xbbb', name: 'Thesauros USDT0 Vault', asset: 'USDT0', network: 'plasma', tvl: usdt, active_provider: null },
     ],
   };
 }
@@ -51,7 +51,7 @@ describe('ReconciliationService', () => {
       expect(nova?.positions).toBe(2);
       expect(nova?.principal).toBe(75_000);
       expect(nova?.current_value as number).toBeGreaterThan(75_000);
-      expect(rows.find((r) => r.asset === 'USDT')?.positions).toBe(1);
+      expect(rows.find((r) => r.asset === 'USDT0')?.positions).toBe(1);
     });
 
     it('is scoped to the calling partner', async () => {
@@ -158,7 +158,7 @@ describe('ReconciliationService', () => {
       const probe = new ReconciliationService(store, stubMonitor(null));
       const breakdown = (await probe.report()).breakdown;
       const usdcRecorded = breakdown.find((b) => b.asset === 'USDC')?.recorded ?? 0;
-      const usdtRecorded = breakdown.find((b) => b.asset === 'USDT')?.recorded ?? 0;
+      const usdtRecorded = breakdown.find((b) => b.asset === 'USDT0')?.recorded ?? 0;
 
       // 1% short on USDC — 100 bps, well past the 10 bps tolerance.
       const service = new ReconciliationService(

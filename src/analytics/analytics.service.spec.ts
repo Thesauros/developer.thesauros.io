@@ -48,7 +48,7 @@ describe('AnalyticsService', () => {
     it('ranks by risk-adjusted APY, discounting by risk tier', async () => {
       const rows = await service.signals();
       // 0.076 * 0.92 (core) beats 0.052 * 1.0 (bluechip).
-      expect(rows[0].vault_id).toBe('vault_morpho_arb_usdt');
+      expect(rows[0].vault_id).toBe('vault_plasma_usdt0');
       expect(rows[0].rank).toBe(1);
       expect(rows[0].recommendation).toBe('overweight');
       const aave = rows.find((r) => r.vault_id === 'vault_aave_base_usdc');
@@ -69,8 +69,8 @@ describe('AnalyticsService', () => {
     });
 
     it('filters by asset', async () => {
-      const rows = await service.signals('usdt');
-      expect(rows.map((r) => r.asset)).toEqual(['USDT']);
+      const rows = await service.signals('usdt0');
+      expect(rows.map((r) => r.asset)).toEqual(['USDT0']);
     });
   });
 
@@ -108,8 +108,8 @@ describe('AnalyticsService', () => {
 
     it('reports baseline coverage instead of silently skipping assets', async () => {
       const result = await service.uplift({ partnerId: ACME });
-      const usdt = result.positions.find((p) => p.asset === 'USDT');
-      // No aave USDT venue exists, so that row has no passive baseline.
+      const usdt = result.positions.find((p) => p.asset === 'USDT0');
+      // No aave USDT0 venue exists, so that row has no passive baseline.
       expect(usdt?.aave_baseline).toBeNull();
       expect(usdt?.uplift_vs_aave).toBeNull();
       expect(result.totals.baseline_coverage).toBeCloseTo(2 / 3, 4);

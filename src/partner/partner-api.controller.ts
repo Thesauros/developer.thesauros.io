@@ -101,7 +101,7 @@ export class PartnerApiController {
   }
 
   @Get('yield/history/:asset')
-  @ApiParam({ name: 'asset', enum: ['USDC', 'USDT'] })
+  @ApiParam({ name: 'asset', enum: ['USDC', 'USDT0'] })
   @ApiOperation({
     summary: 'Yield history for asset (deprecated)',
     deprecated: true,

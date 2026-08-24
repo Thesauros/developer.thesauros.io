@@ -87,6 +87,31 @@ Partner Attribution v1 (public integration surface):
 | Analytics | `GET /api/v1/analytics/{signals,regime,uplift,decisions,advisor}` |
 | Reconciliation | `GET /api/v1/reconciliation/{balances,ledger,snapshots,report}` |
 
+### Scopes & test keys
+
+Key kinds: **admin** (`read`, `write`, …, no partner binding) and **partner**
+(`partner:read`, bound to one partner). Seeded QA keys:
+
+| Key | Kind | Partner |
+| --- | --- | --- |
+| `tsk_test_master_full_access_000000000000000` | admin (all scopes) | — |
+| `tsk_test_acme_partner_key_00000000000000000` | partner | `ptn_seed_acme` (users: `usr_seed_nova`, `usr_seed_orbit`) |
+| `tsk_test_orbit_partner_key_0000000000000000` | partner | `ptn_seed_orbit` (user: `usr_seed_quill`) |
+
+Per endpoint (Swagger at `/swagger` documents the same, with input schemas):
+
+| Endpoints | Scope |
+| --- | --- |
+| `GET /status` | public, no key |
+| `GET /yield/history/:asset`, `GET /analytics/{signals,regime}` | any key (`read` or `partner:read`) — protocol-level |
+| `GET /analytics/{uplift,decisions,advisor}`, `GET /reconciliation/{balances,ledger,snapshots}`, `/usage`, `/users*`, `/webhooks*`, `/partner/*` | **partner key only** — data is scoped to the caller's partner; an admin key gets 403 (no partner to scope to) |
+| `GET /reconciliation/report` | **admin `read` only** — protocol-wide; partner keys get 403 |
+| `/partners*`, `/keys*` | admin scopes (`partner:admin`, `keys:admin`) |
+
+Valid assets are `USDC` and `USDT0` (Plasma's USDT flavour; plain `USDT`
+does not exist). Unknown assets, malformed ids/limits/dates and unknown
+query params are rejected with 400.
+
 Cross-cutting behavior:
 
 - Auth: `Authorization: Bearer tsk_test_... | tsk_live_...`

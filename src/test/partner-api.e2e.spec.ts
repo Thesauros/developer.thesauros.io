@@ -215,8 +215,8 @@ describe('Partner API (e2e)', () => {
     });
 
     it('matches the deprecated alias payload field for field', async () => {
-      const fresh = await get('/api/v1/yield/history/USDT', ACME);
-      const alias = await get('/api/v1/partner/yield/history/USDT', ACME);
+      const fresh = await get('/api/v1/yield/history/USDT0', ACME);
+      const alias = await get('/api/v1/partner/yield/history/USDT0', ACME);
       expect(Object.keys(alias.body.data).sort()).toEqual(Object.keys(fresh.body.data).sort());
       expect(alias.body.data.blend_apy).toBe(fresh.body.data.blend_apy);
     });

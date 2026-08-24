@@ -11,7 +11,7 @@ export class YieldController {
   constructor(private readonly yieldService: YieldService) {}
 
   @Get('history/:asset')
-  @ApiParam({ name: 'asset', enum: ['USDC', 'USDT'] })
+  @ApiParam({ name: 'asset', enum: ['USDC', 'USDT0'] })
   @ApiOperation({
     summary: 'Blended APY history for an asset',
     description:
