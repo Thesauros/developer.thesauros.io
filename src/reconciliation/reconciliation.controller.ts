@@ -2,7 +2,17 @@ import { Controller, ForbiddenException, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { PartnerId, RequiredScope } from '../common/decorators';
 import { paginate } from '../common/paged';
-import { BalancesQueryDto, LedgerQueryDto, ReportQueryDto, SnapshotsQueryDto } from './dto';
+import { ApiEnvelope, ApiEnvelopeList, ApiEnvelopePaged } from '../common/swagger/envelope';
+import {
+  BalanceDto,
+  BalanceSnapshotDto,
+  BalancesQueryDto,
+  LedgerEntryDto,
+  LedgerQueryDto,
+  ReconciliationReportDto,
+  ReportQueryDto,
+  SnapshotsQueryDto,
+} from './dto/index';
 import { ReconciliationService } from './reconciliation.service';
 
 /**
@@ -30,6 +40,7 @@ export class ReconciliationController {
   }
 
   @Get('balances')
+  @ApiEnvelopeList(BalanceDto)
   @ApiForbiddenResponse({ description: 'Key is not partner-scoped.' })
   @ApiOperation({
     summary: 'Recorded balances by user and asset',
@@ -44,6 +55,7 @@ export class ReconciliationController {
   }
 
   @Get('ledger')
+  @ApiEnvelopePaged(LedgerEntryDto, { description: 'Oldest movement first.' })
   @ApiForbiddenResponse({ description: 'Key is not partner-scoped.' })
   @ApiOperation({
     summary: 'Movement rows with running balance',
@@ -63,6 +75,7 @@ export class ReconciliationController {
   }
 
   @Get('snapshots')
+  @ApiEnvelopeList(BalanceSnapshotDto)
   @ApiForbiddenResponse({ description: 'Key is not partner-scoped.' })
   @ApiOperation({
     summary: 'Daily balance snapshots for period accounting',
@@ -78,6 +91,7 @@ export class ReconciliationController {
   }
 
   @Get('report')
+  @ApiEnvelope(ReconciliationReportDto)
   @RequiredScope('read')
   @ApiForbiddenResponse({ description: 'Partner keys cannot read the protocol-wide report.' })
   @ApiOperation({

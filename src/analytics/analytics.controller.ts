@@ -3,7 +3,19 @@ import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiTags, ApiUnauthor
 import { PartnerId, RequiredScope } from '../common/decorators';
 import { paginate } from '../common/paged';
 import { AnalyticsService } from './analytics.service';
-import { AdvisorQueryDto, DecisionsQueryDto, RegimeQueryDto, SignalsQueryDto, UpliftQueryDto } from './dto';
+import { ApiEnvelope, ApiEnvelopeList, ApiEnvelopePaged } from '../common/swagger/envelope';
+import {
+  AdvisorDto,
+  AdvisorQueryDto,
+  DecisionDto,
+  DecisionsQueryDto,
+  RegimeDto,
+  RegimeQueryDto,
+  SignalDto,
+  SignalsQueryDto,
+  UpliftDto,
+  UpliftQueryDto,
+} from './dto/index';
 
 /**
  * Rebalancer decision telemetry.
@@ -30,6 +42,7 @@ export class AnalyticsController {
   }
 
   @Get('signals')
+  @ApiEnvelopeList(SignalDto, { description: 'Venues ranked by risk-adjusted APY, best first.' })
   @ApiOperation({
     summary: 'Risk-adjusted venue signals from observed APY history',
     description:
@@ -41,6 +54,7 @@ export class AnalyticsController {
   }
 
   @Get('regime')
+  @ApiEnvelope(RegimeDto)
   @ApiOperation({
     summary: 'Current rate regime and per-asset trend',
     description:
@@ -52,6 +66,7 @@ export class AnalyticsController {
   }
 
   @Get('uplift')
+  @ApiEnvelope(UpliftDto)
   @ApiForbiddenResponse({ description: 'Key is not partner-scoped.' })
   @ApiOperation({
     summary: 'Routed value vs the passive baseline, realized and projected',
@@ -68,6 +83,7 @@ export class AnalyticsController {
   }
 
   @Get('decisions')
+  @ApiEnvelopePaged(DecisionDto, { description: 'Newest decision first.' })
   @ApiForbiddenResponse({ description: 'Key is not partner-scoped.' })
   @ApiOperation({
     summary: 'Executed routing and rebalance decisions with rationale',
@@ -86,6 +102,7 @@ export class AnalyticsController {
   }
 
   @Get('advisor')
+  @ApiEnvelope(AdvisorDto)
   @ApiForbiddenResponse({ description: 'Key is not partner-scoped.' })
   @ApiOperation({
     summary: 'Current recommendations with rationale',

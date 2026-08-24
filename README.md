@@ -79,13 +79,25 @@ Partner Attribution v1 (public integration surface):
 | Partners | `POST /api/v1/partners`, `GET /api/v1/partners`, `GET /api/v1/partners/:id`, `PATCH /api/v1/partners/:id` |
 | Campaigns | `POST /api/v1/partners/:id/campaigns`, `GET /api/v1/partners/:id/campaigns`, `PATCH /api/v1/partners/:id/campaigns/:campaignId` |
 | Partner portal data | `GET /api/v1/partner/summary`, `GET /api/v1/partner/users`, `GET /api/v1/partner/deposits`, `GET /api/v1/partner/yield/history/:asset`, `GET /api/v1/partner/revenue`, `GET /api/v1/partner/user/:id/positions` |
-| Yield | `GET /api/v1/yield/history/:asset` |
+| Yield | `GET /api/v1/yield/history/:asset` (blended series + per-venue `breakdown[]`) |
+| Vaults | `GET /api/v1/vaults?asset=&network=`, `GET /api/v1/apy/history?vault=&days=` |
 | Webhooks | `POST /api/v1/webhooks`, `GET /api/v1/webhooks`, `DELETE /api/v1/webhooks/:id`, `POST /api/v1/webhooks/:id/test`, `GET /api/v1/webhooks/events`, `GET /api/v1/webhooks/:id/deliveries` |
 | Usage | `GET /api/v1/usage?range=` |
 | Users | `POST /api/v1/users`, `GET /api/v1/users/:id/ledger` |
 | Status | `GET /api/v1/status` (public) |
 | Analytics | `GET /api/v1/analytics/{signals,regime,uplift,decisions,advisor}` |
 | Reconciliation | `GET /api/v1/reconciliation/{balances,ledger,snapshots,report}` |
+
+### Schema
+
+- Swagger UI: `/swagger`
+- Raw OpenAPI 3 for Postman/Insomnia import: `/api/v1/openapi.json`
+
+Served on staging and dev; **withheld in production** by design.
+`SWAGGER=true|false` overrides either way. Response schemas
+describe the envelope you actually receive — `{object, data}` for a single
+resource, `{object:"list", data, meta}` for collections — with a worked
+example on every field.
 
 ### Scopes & test keys
 

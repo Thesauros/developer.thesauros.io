@@ -1,5 +1,5 @@
 import { IntersectionType } from '@nestjs/swagger';
-import { AssetQueryDto, PageQueryDto, ScopeFilterQueryDto } from '../common/dto/query.dto';
+import { AssetQueryDto, PageQueryDto, ScopeFilterQueryDto } from '../../common/dto/query.dto';
 
 export class SignalsQueryDto extends AssetQueryDto {}
 export class RegimeQueryDto extends AssetQueryDto {}

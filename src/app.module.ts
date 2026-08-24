@@ -15,6 +15,7 @@ import { UsersModule } from './users/users.module';
 import { StatusModule } from './status/status.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { ReconciliationModule } from './reconciliation/reconciliation.module';
+import { VaultsModule } from './vaults/vaults.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { ReconciliationModule } from './reconciliation/reconciliation.module';
     StatusModule,
     AnalyticsModule,
     ReconciliationModule,
+    VaultsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ApiThrottlerGuard },

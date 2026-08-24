@@ -1,4 +1,5 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor';
@@ -39,4 +40,43 @@ export function configureApp(app: INestApplication): void {
   );
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new ResponseEnvelopeInterceptor());
+  if (swaggerEnabled()) {
+    setupSwagger(app);
+  }
+}
+
+/**
+ * Production withholds the schema by design — it is an internal deployment,
+ * not the published docs surface. Every other environment (staging, dev)
+ * serves it. `SWAGGER=true|false` overrides either way.
+ */
+export function swaggerEnabled(): boolean {
+  const flag = process.env.SWAGGER;
+  if (flag === 'true') return true;
+  if (flag === 'false') return false;
+  return (process.env.NODE_ENV ?? 'development') !== 'production';
+}
+
+/**
+ * Lives here rather than in main.ts so the e2e suite exercises the same
+ * document the deployments serve.
+ */
+export function setupSwagger(app: INestApplication): void {
+  const config = new DocumentBuilder()
+    .setTitle('Thesauros Partner API')
+    .setDescription(
+      'Partner Attribution v1 & Partner API v1.\n\n' +
+        'Every response is enveloped: `{object, data}` for a single resource, ' +
+        '`{object:"list", data, meta}` for collections. Paginated lists take ' +
+        '`?limit=` and `?cursor=`, where the cursor is the previous page\'s ' +
+        '`meta.next_cursor` — omit it for the first page.',
+    )
+    .setVersion('1.0')
+    .addBearerAuth({ type: 'http', scheme: 'bearer', description: 'API key (tsk_test_...)' })
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  // Raw schema for tooling (Postman/Insomnia import, codegen), under the same
+  // prefix as the API itself.
+  app.getHttpAdapter().get('/api/v1/openapi.json', (_req: unknown, res: any) => res.json(document));
+  SwaggerModule.setup('swagger', app, document);
 }
