@@ -78,6 +78,8 @@ describe('OpenAPI document (e2e)', () => {
       '/api/v1/reconciliation/ledger',
       '/api/v1/reconciliation/snapshots',
       '/api/v1/reconciliation/report',
+      '/api/v1/vaults',
+      '/api/v1/apy/history',
     ]) {
       expect([path, Boolean(doc.paths[path]?.get)]).toEqual([path, true]);
     }

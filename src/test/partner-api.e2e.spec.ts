@@ -191,7 +191,12 @@ describe('Partner API (e2e)', () => {
       expect(res.body.data.scope).toBe('protocol');
       expect(res.body.data.asset).toBe('USDC');
       expect(res.body.data.blend_apy).toBeGreaterThan(0);
-      expect(res.body.data.history).toHaveLength(30);
+      // History is observed, not generated: one point per day that was
+      // actually recorded, capped at the 30-day window.
+      expect(res.body.data.history.length).toBe(res.body.data.observations);
+      expect(res.body.data.history.length).toBeLessThanOrEqual(30);
+      expect(res.body.data.breakdown.length).toBeGreaterThan(0);
+      expect(res.body.data.breakdown[0]).toHaveProperty('risk_tier');
     });
 
     it('returns byte-identical series to every caller, partner-bound or not', async () => {
