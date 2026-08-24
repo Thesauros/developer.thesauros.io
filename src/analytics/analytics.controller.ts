@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiTags, ApiUnauthor
 import { PartnerId, RequiredScope } from '../common/decorators';
 import { paginate } from '../common/paged';
 import { AnalyticsService } from './analytics.service';
-import { AdvisorQueryDto, DecisionsQueryDto, RegimeQueryDto, SignalsQueryDto, UpliftQueryDto } from './dto';
+import { AdvisorQueryDto, DecisionsQueryDto, RegimeQueryDto, SignalsQueryDto, UpliftQueryDto } from './dto/index';
 
 /**
  * Rebalancer decision telemetry.

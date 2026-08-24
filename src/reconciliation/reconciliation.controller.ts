@@ -2,7 +2,7 @@ import { Controller, ForbiddenException, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { PartnerId, RequiredScope } from '../common/decorators';
 import { paginate } from '../common/paged';
-import { BalancesQueryDto, LedgerQueryDto, ReportQueryDto, SnapshotsQueryDto } from './dto';
+import { BalancesQueryDto, LedgerQueryDto, ReportQueryDto, SnapshotsQueryDto } from './dto/index';
 import { ReconciliationService } from './reconciliation.service';
 
 /**

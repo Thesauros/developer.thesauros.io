@@ -1,6 +1,6 @@
 import { ApiPropertyOptional, IntersectionType } from '@nestjs/swagger';
 import { IsISO8601, IsOptional } from 'class-validator';
-import { AssetQueryDto, PageQueryDto, ScopeFilterQueryDto } from '../common/dto/query.dto';
+import { AssetQueryDto, PageQueryDto, ScopeFilterQueryDto } from '../../common/dto/query.dto';
 
 export class BalancesQueryDto extends ScopeFilterQueryDto {}
 
