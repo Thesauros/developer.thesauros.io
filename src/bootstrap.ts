@@ -40,18 +40,26 @@ export function configureApp(app: INestApplication): void {
   );
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new ResponseEnvelopeInterceptor());
-  if (process.env.SWAGGER !== 'false') {
+  if (swaggerEnabled()) {
     setupSwagger(app);
   }
 }
 
 /**
- * The API surface is public documentation — partners integrate against it —
- * so the schema ships in production too. Set SWAGGER=false to withhold it.
- * Auth is unaffected: every documented route still requires its key.
- *
+ * Production withholds the schema by design — it is an internal deployment,
+ * not the published docs surface. Every other environment (staging, dev)
+ * serves it. `SWAGGER=true|false` overrides either way.
+ */
+export function swaggerEnabled(): boolean {
+  const flag = process.env.SWAGGER;
+  if (flag === 'true') return true;
+  if (flag === 'false') return false;
+  return (process.env.NODE_ENV ?? 'development') !== 'production';
+}
+
+/**
  * Lives here rather than in main.ts so the e2e suite exercises the same
- * document the deployment serves.
+ * document the deployments serve.
  */
 export function setupSwagger(app: INestApplication): void {
   const config = new DocumentBuilder()

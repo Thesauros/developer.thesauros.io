@@ -2,16 +2,7 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { configureApp } from './bootstrap';
-
-/**
- * The API surface is public documentation — partners integrate against it —
- * so the schema ships in production too. Set SWAGGER=false to withhold it.
- * Auth is unaffected: every documented route still requires its key.
- */
-function swaggerEnabled(): boolean {
-  return process.env.SWAGGER !== 'false';
-}
+import { configureApp, swaggerEnabled } from './bootstrap';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);

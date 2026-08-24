@@ -92,7 +92,8 @@ Partner Attribution v1 (public integration surface):
 - Swagger UI: `/swagger`
 - Raw OpenAPI 3 for Postman/Insomnia import: `/api/v1/openapi.json`
 
-Both ship in production (`SWAGGER=false` withholds them). Response schemas
+Served on staging and dev; **withheld in production** by design.
+`SWAGGER=true|false` overrides either way. Response schemas
 describe the envelope you actually receive — `{object, data}` for a single
 resource, `{object:"list", data, meta}` for collections — with a worked
 example on every field.

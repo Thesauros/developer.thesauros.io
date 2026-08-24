@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../app.module';
 import { DatabaseModule } from '../database/database.module';
-import { configureApp } from '../bootstrap';
+import { configureApp, swaggerEnabled } from '../bootstrap';
 import { createTestDataSource, destroyTestStore } from './create-test-store';
 
 /** The published schema must describe the envelope clients actually receive. */
@@ -24,9 +24,8 @@ describe('OpenAPI document (e2e)', () => {
     class TestDatabaseModule {}
 
     process.env.DB_SEED = 'true';
-    // The deployment runs in production; the schema must ship there too.
-    process.env.NODE_ENV = 'production';
-    process.env.ENCRYPTION_KEY = 'a'.repeat(64);
+    // Staging serves the schema; production withholds it (asserted below).
+    process.env.NODE_ENV = 'staging';
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideModule(DatabaseModule)
       .useModule(TestDatabaseModule)
@@ -41,14 +40,31 @@ describe('OpenAPI document (e2e)', () => {
 
   afterAll(async () => {
     delete process.env.NODE_ENV;
-    delete process.env.ENCRYPTION_KEY;
     await app?.close();
     await destroyTestStore(dataSource);
   });
 
-  it('is served without auth in production', () => {
+  it('is served on staging without auth', () => {
     expect(doc.openapi).toMatch(/^3\./);
     expect(Object.keys(doc.paths).length).toBeGreaterThan(10);
+  });
+
+  it('is withheld in production unless explicitly enabled', () => {
+    const prev = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = 'production';
+      expect(swaggerEnabled()).toBe(false);
+      process.env.SWAGGER = 'true';
+      expect(swaggerEnabled()).toBe(true);
+      delete process.env.SWAGGER;
+      process.env.NODE_ENV = 'staging';
+      expect(swaggerEnabled()).toBe(true);
+      process.env.SWAGGER = 'false';
+      expect(swaggerEnabled()).toBe(false);
+    } finally {
+      delete process.env.SWAGGER;
+      process.env.NODE_ENV = prev;
+    }
   });
 
   it('documents every P2 route', () => {
