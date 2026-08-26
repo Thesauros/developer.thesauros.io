@@ -59,7 +59,11 @@ See `.env.example`. Key variables:
 
 - `API_PORT` / `PORT` — listen port (default 3001)
 - `DATABASE_URL` (+ `PGHOST`/`PGDATABASE`/`PGUSER`/`PGPASSWORD`/`PGPORT`) — Postgres
-- `DB_SYNCHRONIZE`, `DB_SEED`, `DB_SSL`, `DB_LOGGING` — TypeORM behavior
+- `DB_SYNCHRONIZE`, `DB_SEED`, `DB_SSL`, `DB_LOGGING` — TypeORM behavior.
+  `DB_SEED` defaults on: each boot brings the fixtures to the definition in
+  the running build (a fixture that changed shape in code no longer stays
+  stale on a long-lived stand). Only fixture ids are touched — records
+  created through the API are left alone. `DB_SEED=false` skips it.
 - `ENCRYPTION_KEY` — 32-byte hex key for API key encryption at rest
 - `CORS_ORIGINS` — allowed origins (e.g. the portal deployment)
 - `PARTNER_API_URL` — where the portal's Next.js rewrites proxy
