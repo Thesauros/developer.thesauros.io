@@ -76,3 +76,86 @@ describe('StoreService', () => {
     expect(id).toMatch(/^ptn_[0-9a-f]{16}$/);
   });
 });
+
+describe('StoreService seed reconciliation', () => {
+  let dataSource: DataSource;
+  let store: StoreService;
+
+  beforeEach(async () => {
+    ({ dataSource, store } = await createTestStore());
+  });
+
+  afterEach(async () => {
+    await destroyTestStore(dataSource);
+  });
+
+  it('corrects a fixture that drifted from the current build', async () => {
+    // Reproduce a stand seeded before the USDT -> USDT0 rename.
+    await store.update('positions', 'pos_seed_beta', { asset: 'USDT' } as any);
+    await store.onModuleInit();
+
+    const position = await store.get<any>('positions', 'pos_seed_beta');
+    expect(position.asset).toBe('USDT0');
+  });
+
+  it('removes a vault an older build defined', async () => {
+    await store.create('vaults', {
+      id: 'vault_morpho_arb_usdt',
+      object: 'vault',
+      name: 'Morpho Blue USDT Yield',
+      provider: 'morpho',
+      asset: 'USDT',
+      chain: 'arbitrum',
+      apy: 0.076,
+      apy_7d_avg: 0.073,
+      apy_30d_avg: 0.07,
+      tvl_usd: 1,
+      capacity_usd: 1,
+      risk_tier: 'core',
+      status: 'active',
+      allocation_pct: 0,
+    } as any);
+
+    await store.onModuleInit();
+
+    expect(await store.get('vaults', 'vault_morpho_arb_usdt')).toBeNull();
+    expect(await store.get('vaults', 'vault_plasma_usdt0')).not.toBeNull();
+  });
+
+  it('leaves records QA created through the API alone', async () => {
+    const created = await store.create('users', {
+      id: 'usr_qa_manual',
+      object: 'user',
+      external_id: 'qa-1',
+      label: 'QA user',
+      email: null,
+      wallets: [],
+      status: 'active',
+      metadata: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as any);
+
+    await store.onModuleInit();
+
+    expect(await store.get('users', created.id)).not.toBeNull();
+  });
+
+  it('is idempotent — a second boot writes nothing', async () => {
+    const before = await store.all('positions');
+    await store.onModuleInit();
+    const after = await store.all('positions');
+    expect(after.length).toBe(before.length);
+  });
+
+  it('still honours DB_SEED=false', async () => {
+    await store.remove('positions', 'pos_seed_beta');
+    process.env.DB_SEED = 'false';
+    try {
+      await store.onModuleInit();
+      expect(await store.get('positions', 'pos_seed_beta')).toBeNull();
+    } finally {
+      process.env.DB_SEED = 'true';
+    }
+  });
+});

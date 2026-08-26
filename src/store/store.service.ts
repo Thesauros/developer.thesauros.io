@@ -87,11 +87,6 @@ export class StoreService implements OnModuleInit {
       this.logger.log('DB_SEED=false — skipping seed');
       return;
     }
-    const partnerCount = await this.repo('partners').count();
-    if (partnerCount > 0) {
-      this.logger.log(`Store already seeded (${partnerCount} partners) — skipping`);
-      return;
-    }
     await this.seedDatabase();
   }
 
@@ -146,6 +141,18 @@ export class StoreService implements OnModuleInit {
     return `${prefix}_${randomBytes(bytes).toString('hex')}`;
   }
 
+  /**
+   * Bring the fixtures to the definition in this build, every boot.
+   *
+   * This used to bail out whenever the database held any partner, so a
+   * fixture that changed shape in code stayed stale on long-lived stands
+   * forever — the USDT -> USDT0 rename shipped and QA kept seeing USDT
+   * positions that the API's own asset filter then rejected as invalid.
+   *
+   * Only fixture rows are touched: every id below is one this seeder owns.
+   * Records QA creates through the API have generated ids, are never in the
+   * seed set, and are left alone.
+   */
   private async seedDatabase(): Promise<void> {
     const partners = this.buildPartners();
     const campaigns = this.buildCampaigns();
@@ -154,18 +161,79 @@ export class StoreService implements OnModuleInit {
     const vaults = this.buildVaults();
     const users = this.buildUsers();
     const { positions, events } = this.buildPositions();
-    await this.repo('partners').save(partners);
-    await this.repo('campaigns').save(campaigns);
-    await this.repo('users').save(users);
-    await this.repo('attributions').save(attributions);
-    await this.repo('keys').save(keys);
-    await this.repo('vaults').save(vaults);
-    await this.repo('positions').save(positions);
-    await this.repo('positionEvents').save(events);
+
+    const changed = await this.upsertAll([
+      ['partners', partners],
+      ['campaigns', campaigns],
+      ['users', users],
+      ['attributions', attributions],
+      ['keys', keys],
+      ['vaults', vaults],
+      ['positions', positions],
+      ['positionEvents', events],
+    ]);
+
+    // Vaults are produced by this seeder alone, so any row outside the seed
+    // set is a fixture an older build defined (vault_morpho_arb_usdt, say)
+    // and would otherwise keep serving a decommissioned venue.
+    const dropped = await this.dropStaleVaults(vaults.map((v) => v.id));
+
+    if (changed === 0 && dropped === 0) {
+      this.logger.log('Seed fixtures already match this build');
+      return;
+    }
     this.logger.log(
-      `DB seeded: ${partners.length} partners, ${campaigns.length} campaigns, ` +
-      `${users.length} users, ${positions.length} positions`,
+      `Seed reconciled: ${changed} row(s) written` +
+      (dropped ? `, ${dropped} stale vault(s) removed` : ''),
     );
+  }
+
+  /** Write fixtures whose stored copy differs, and report how many changed. */
+  private async upsertAll(
+    groups: [StoreCollection, ObjectLiteral[]][],
+  ): Promise<number> {
+    let changed = 0;
+    for (const [collection, records] of groups) {
+      const repo = this.repo(collection);
+      const stale: ObjectLiteral[] = [];
+      for (const record of records) {
+        const existing = await repo.findOneBy({ id: record.id } as any);
+        if (!existing || this.differs(existing, record)) stale.push(record);
+      }
+      if (stale.length) {
+        await repo.save(stale as any);
+        changed += stale.length;
+      }
+    }
+    return changed;
+  }
+
+  /**
+   * Field-by-field comparison against the fixture. Dates hydrate as Date
+   * objects and numerics can come back as strings, so compare rendered
+   * values rather than identity.
+   */
+  private differs(existing: ObjectLiteral, fixture: ObjectLiteral): boolean {
+    return Object.keys(fixture).some((key) => {
+      const a = existing[key];
+      const b = (fixture as Record<string, unknown>)[key];
+      if (a instanceof Date || b instanceof Date) {
+        return new Date(a as string).getTime() !== new Date(b as string).getTime();
+      }
+      if (a && typeof a === 'object') return JSON.stringify(a) !== JSON.stringify(b);
+      return String(a) !== String(b);
+    });
+  }
+
+  private async dropStaleVaults(currentIds: string[]): Promise<number> {
+    const repo = this.repo('vaults');
+    const stored = await repo.find();
+    const keep = new Set(currentIds);
+    const stale = stored.filter((v) => !keep.has(v.id as string));
+    for (const vault of stale) {
+      await repo.delete(vault.id as string);
+    }
+    return stale.length;
   }
 
   private buildPartners(): PartnerEntity[] {
