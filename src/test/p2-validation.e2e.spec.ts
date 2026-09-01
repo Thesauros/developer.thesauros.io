@@ -89,6 +89,27 @@ describe('P2 validation & scopes (e2e)', () => {
       const res = await get('/api/v1/reconciliation/snapshots?from=yesterday', ACME);
       expect(res.status).toBe(400);
     });
+
+    // TS-361: the docs promise days is 1-90; 0 and 365 used to be clamped
+    // silently to 1 and 90 and answered 200.
+    it('rejects an apy/history window outside the documented 1-90', async () => {
+      for (const days of ['0', '91', '365', '-1', '7.5', 'abc']) {
+        const res = await get(`/api/v1/apy/history?vault=vault_plasma_usdt0&days=${days}`, ACME);
+        expect([days, res.status]).toEqual([days, 400]);
+        expect(res.body.error.message).toContain('days');
+      }
+    });
+
+    it('serves the boundaries of the apy/history window', async () => {
+      for (const days of [1, 90]) {
+        const res = await get(`/api/v1/apy/history?vault=vault_plasma_usdt0&days=${days}`, ACME);
+        expect([days, res.status]).toEqual([days, 200]);
+        expect(res.body.data.days).toBe(days);
+      }
+      // Omitted stays the documented default rather than the clamp's.
+      const fallback = await get('/api/v1/apy/history?vault=vault_plasma_usdt0', ACME);
+      expect(fallback.body.data.days).toBe(7);
+    });
   });
 
   describe('scopes', () => {

@@ -2,10 +2,8 @@ import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { RequiredScope } from '../common/decorators';
 import { ApiEnvelope, ApiEnvelopeList } from '../common/swagger/envelope';
-import { ApyHistoryDto, ApyHistoryQueryDto, VaultDto, VaultsQueryDto } from './dto/index';
+import { ApyHistoryDto, ApyHistoryQueryDto, DEFAULT_HISTORY_DAYS, VaultDto, VaultsQueryDto } from './dto/index';
 import { VaultsService } from './vaults.service';
-
-const MAX_HISTORY_DAYS = 90;
 
 /**
  * Protocol-level vault reference data. Same answer for every caller, so any
@@ -43,7 +41,8 @@ export class VaultsController {
       '`vault` is required; `days` is 1-90 (default 7). Points are the recorded hourly observations, oldest first.',
   })
   async apyHistory(@Query() query: ApyHistoryQueryDto) {
-    const days = Math.min(MAX_HISTORY_DAYS, Math.max(1, parseInt(query.days ?? '7', 10) || 7));
-    return this.vaults.apyHistory(query.vault, days);
+    // Out-of-range windows are a 400 from the DTO, not a silent clamp: a caller
+    // asking for 365 days was being handed 90 and no way to tell.
+    return this.vaults.apyHistory(query.vault, query.days ?? DEFAULT_HISTORY_DAYS);
   }
 }
